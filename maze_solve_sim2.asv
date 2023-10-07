@@ -14,7 +14,7 @@ global vidObj; %動画作成用のビデオオブジェクト
 %ビデオフラグ
 video_flg = 0;
 %画像なら0,数字直打ち1
-get_maze_mode=1;
+get_maze_mode=0;
 %% ビデオ記録用変数の宣言
 if video_flg
     vidObj = VideoWriter('result.mp4','MPEG-4');
@@ -53,8 +53,8 @@ maze_goal = uint8(zeros(9,2));
 %2017全日本 20 21 9
 %2020全日本学生 4 4 4
 
-goal_x = 11;%610;%ゴール左下のx座標
-goal_y = 10;%911;%ゴール左下のy座標
+goal_x = 6;%610;%ゴール左下のx座標
+goal_y = 9;%911;%ゴール左下のy座標
 goal_size = uint8(4);%ゴールサイズを入力する
 
 goal_size_d = double(goal_size);
@@ -73,8 +73,6 @@ global  maze_serial;
 [maze_row_size,maze_col_size,maze_row_data,maze_col_data] = maze_data_get;
 maze_row_size = uint8(maze_row_size);
 maze_col_size = uint8(maze_col_size);
-
-maze_data_to_serial(maze_row_size,maze_col_size,maze_row_data,maze_col_data);
 
 global  g_maze_row;
 global  g_maze_column;
@@ -125,13 +123,15 @@ D_row_map=uint16(zeros(16,15));
 D_column_map=uint16(zeros(16,15));
 maze_data_plot2_solve(wall_row,maze_row_size,wall_column,maze_col_size,coordinate(1),coordinate(2),coordinate(3));
 
+Straight_all=[]
+
 while (1)%Dijkstra_maker,Error
 
     [Sensor_front,Sensor_right,Sensor_left]=maze_get_wall(coordinate(1),coordinate(2),coordinate(3),g_maze_row,g_maze_column);
 
     wall_row_0=wall_row;
     wall_column_0 =wall_column;
-[wall_row,wall_column,wall_row_look,wall_column_look,coordinate,g_walk_count,D_row_map,D_column_map,all_mode]=run_maze_solve_front( ...
+[wall_row,wall_column,wall_row_look,wall_column_look,coordinate,g_walk_count,D_row_map,D_column_map,all_mode,Straight_log,Turning_log]=run_maze_solve_front( ...
     wall_row,wall_column,wall_row_look,wall_column_look, ...
     uint32(goal_x),uint32(goal_y),coordinate(1),coordinate(2),coordinate(3),Sensor_front,Sensor_right,Sensor_left, ...
     all_mode(1),all_mode(2),D_row_map,D_column_map);
@@ -154,7 +154,7 @@ while (1)%Dijkstra_maker,Error
 
     wall_row_0=wall_row;
     wall_column_0 =wall_column;
-[wall_row,wall_column,wall_row_look,wall_column_look,coordinate,g_walk_count,D_row_map,D_column_map,all_mode]=run_maze_solve_back( ...
+[wall_row,wall_column,wall_row_look,wall_column_look,coordinate,g_walk_count,D_row_map,D_column_map,all_mode,Straight_log,Turning_log]=run_maze_solve_back( ...
     wall_row,wall_column,wall_row_look,wall_column_look, ...
     uint32(goal_x),uint32(goal_y),coordinate(1),coordinate(2),coordinate(3),Sensor_front,Sensor_right,Sensor_left, ...
     all_mode(1),all_mode(2),D_row_map,D_column_map);
@@ -173,59 +173,13 @@ end
 
 maze_data_plot2_Dresult(wall_row,maze_row_size,wall_column,maze_col_size,D_row_map,D_column_map);
 
-Pass=run_pass_maker( ...
+[Pass,Xp,Yp]=run_pass_maker( ...
     wall_row,wall_column,wall_row_look,wall_column_look, ...
     uint32(goal_x),uint32(goal_y),coordinate(1),coordinate(2),coordinate(3),Sensor_front,Sensor_right,Sensor_left, ...
     all_mode(1),all_mode(2),D_row_map,D_column_map);
 
-route_maker(Pass);
-
-%% 壁センサ値初期値入力(Cコード生成用)
-%壁センサAD値格納変数
-global wall_sensor_front;
-global wall_sensor_right;
-global wall_sensor_left;
-%壁センサ閾値
-global wall_sensor_front_th;
-global wall_sensor_right_th;
-global wall_sensor_left_th;
-
-wall_sensor_front = int16(0);
-wall_sensor_right = int16(0);
-wall_sensor_left = int16(0);
-wall_sensor_front_th = int16(0);
-wall_sensor_right_th = int16(0);
-wall_sensor_left_th = int16(0);
-
-if sim_mode_flg == sim_mode.unknown
-    %% 足立法で探索
-    
-    %% 迷路情報初期化
-    [maze_wall,maze_wall_search] = maze_init(maze_row_size,maze_col_size);
-    maze_wall_plotall(maze_row_size,maze_col_size,maze_wall);
-    
-    %% モード定義
-    run_mode1_flg = run_mode1.search;
-    run_mode2_flg = run_mode2.adachi;
-    [maze_wall,maze_wall_search,contour_map] = maze_solve(maze_wall,maze_wall_search,maze_row_size,maze_col_size,goal_size,maze_goal,run_mode1_flg,run_mode2_flg);
-    
-    %% 探索情報をもとに最短走行
-    %モード定義
-    run_mode1_flg = run_mode1.fust_run;
-    run_mode2_flg = run_mode2.diagonal;
-    [maze_wall,maze_wall_search,contour_map] = maze_solve(maze_wall,maze_wall_search,maze_row_size,maze_col_size,goal_size,maze_goal,run_mode1_flg,run_mode2_flg);
-end
-
-if sim_mode_flg == sim_mode.known
-    %% 全壁を既知とした最短走行(直線)
-    
-    %モード定義
-    run_mode1_flg = run_mode1.fust_run;
-    
-    maze_wall_search = ones(32,32,'uint8')*15;
-    [maze_wall,maze_wall_search,contour_map,row_num_node,col_num_node] = maze_solve(maze_serial,maze_wall_search,maze_row_size,maze_col_size,goal_size,maze_goal,run_mode1_flg,run_mode2_flg);
-    
-end
+route_plot(Xp,Yp);
+%route_maker(Pass);
 
 %% ビデオ作成の完了
 if video_flg

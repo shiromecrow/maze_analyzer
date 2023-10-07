@@ -123,13 +123,17 @@ D_row_map=uint16(zeros(16,15));
 D_column_map=uint16(zeros(16,15));
 maze_data_plot2_solve(wall_row,maze_row_size,wall_column,maze_col_size,coordinate(1),coordinate(2),coordinate(3));
 
+Straight_all=[];
+Turning_all=[];
+T_all=0;
+
 while (1)%Dijkstra_maker,Error
 
     [Sensor_front,Sensor_right,Sensor_left]=maze_get_wall(coordinate(1),coordinate(2),coordinate(3),g_maze_row,g_maze_column);
 
     wall_row_0=wall_row;
     wall_column_0 =wall_column;
-[wall_row,wall_column,wall_row_look,wall_column_look,coordinate,g_walk_count,D_row_map,D_column_map,all_mode]=run_maze_solve_front( ...
+[wall_row,wall_column,wall_row_look,wall_column_look,coordinate,g_walk_count,D_row_map,D_column_map,all_mode,Straight_log,Turning_log]=run_maze_solve_front( ...
     wall_row,wall_column,wall_row_look,wall_column_look, ...
     uint32(goal_x),uint32(goal_y),coordinate(1),coordinate(2),coordinate(3),Sensor_front,Sensor_right,Sensor_left, ...
     all_mode(1),all_mode(2),D_row_map,D_column_map);
@@ -138,6 +142,9 @@ D_column_map=D_column_map';
 del_wall_row=wall_row - wall_row_0;
 del_wall_column=wall_column - wall_column_0 ;
 
+%Straight_all=[Straight_all Straight_log(1:end-1)];
+%Turning_all=[Turning_all Turning_log(1:end-1)];
+T_all=T_all+Straight_log(end);
 maze_data_plot2_solve(del_wall_row,maze_row_size,del_wall_column,maze_col_size,coordinate(1),coordinate(2),coordinate(3));
 
 %coordinate
@@ -146,13 +153,14 @@ break
 end
 end
 
+T_all
 while (1)%Dijkstra_maker,Error
 
     [Sensor_front,Sensor_right,Sensor_left]=maze_get_wall(coordinate(1),coordinate(2),coordinate(3),g_maze_row,g_maze_column);
 
     wall_row_0=wall_row;
     wall_column_0 =wall_column;
-[wall_row,wall_column,wall_row_look,wall_column_look,coordinate,g_walk_count,D_row_map,D_column_map,all_mode]=run_maze_solve_back( ...
+[wall_row,wall_column,wall_row_look,wall_column_look,coordinate,g_walk_count,D_row_map,D_column_map,all_mode,Straight_log,Turning_log]=run_maze_solve_back( ...
     wall_row,wall_column,wall_row_look,wall_column_look, ...
     uint32(goal_x),uint32(goal_y),coordinate(1),coordinate(2),coordinate(3),Sensor_front,Sensor_right,Sensor_left, ...
     all_mode(1),all_mode(2),D_row_map,D_column_map);
@@ -161,6 +169,9 @@ D_column_map=D_column_map';
 del_wall_row=wall_row - wall_row_0;
 del_wall_column=wall_column - wall_column_0 ;
 
+%Straight_all=[Straight_all Straight_log(1:end-1)];
+%Turning_all=[Turning_all Turning_log(1:end-1)];
+T_all=T_all+Straight_log(end);
 maze_data_plot2_solve(del_wall_row,maze_row_size,del_wall_column,maze_col_size,coordinate(1),coordinate(2),coordinate(3));
 
 %coordinate
@@ -168,7 +179,7 @@ if (coordinate(1)==0) && (coordinate(2)==0)
 break
 end
 end
-
+T_all
 maze_data_plot2_Dresult(wall_row,maze_row_size,wall_column,maze_col_size,D_row_map,D_column_map);
 
 [Pass,Xp,Yp]=run_pass_maker( ...

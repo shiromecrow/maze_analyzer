@@ -235,8 +235,8 @@ void reset_gyro(void) {}
 void reset_distance(void) {}
 void wait_ms_NoReset(uint32_t waitTime) {
     for(int i = 0;i < waitTime;i++){
-    straight_velocity_log[log_num+i]=0; 
-    turning_velocity_log[log_num+i]=0;
+    straight_velocity_log[log_num+i]; 
+    turning_velocity_log[log_num+i];
     }
     log_num=log_num + waitTime;
 }

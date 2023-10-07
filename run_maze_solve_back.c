@@ -1,5 +1,6 @@
 #include <string.h> /* needed for memcpy() */
 #include <stdint.h> /* needed for memcpy() */
+#include "math.h"
 #include "mex.h"
 
 /*
@@ -15,7 +16,11 @@
 #define TOTAL_ELEMENTS3 240
 #define TOTAL_ELEMENTS4 2
 
-
+#define INTERRUPT_TIME 0.001
+#define MOTOR_STOP 0
+#define MOTOR_FRONT 1
+#define MOTOR_BACK 2
+#define MOTOR_BREAK 3
 #define MAX_QUEUE_NUM 1000
 #define ROW 0
 #define COLUMN 1
@@ -31,7 +36,7 @@
 #define BACK_TO_CENTER_FRONT_SLANT 34.5
 #define EXPLORATION 0
 #define SHORTEST 1
-
+#define MOLLIFIER_INTEGRAL 0.444
 
 
 #define VERTICALCOST 180
@@ -52,6 +57,12 @@
 #define SLANT_WEST 6
 #define SLANT_NORTH_WEST 7
 
+#define OFFSET_CONTROL_IN_SLALOM 0//大回りのオフセットでの壁制御(入り)
+#define OFFSET_CONTROL_OUT_SLALOM 0//大回りのオフセットでの壁制御(出る)
+#define OFFSET_CONTROL_IN 0//大回りのオフセットでの壁制御(入り)
+#define OFFSET_CONTROL_OUT 1//大回りのオフセットでの壁制御(出る)
+#define OFFSET_CONTROL_IN_SLANT 0//3で制御あり
+#define OFFSET_CONTROL_OUT_SLANT 3//3で制御あり
 
 // スタック構造体
 typedef struct{
@@ -83,6 +94,29 @@ typedef struct {
 		float t_speed;
 		float t_acc;
 } parameter;
+
+typedef struct {
+	float velocity;
+	float acceleration;
+	float displacement;
+
+}TARGET;
+
+typedef struct{
+	float displacement;
+	float start_velocity;
+	float end_velocity;
+	float count_velocity;
+	float acceleration;
+	float deceleration;
+
+}TRAPEZOID;
+
+typedef struct{
+	float displacement;
+	float center_velocity;
+	float max_turning_velocity;
+}MOLLIFIER;
 
 
 typedef struct {
@@ -127,6 +161,18 @@ int g_timCount_sec=10;
 int noGoalPillarMode;
 uint8_t g_WallControl_mode;
 parameter_speed speed300_exploration;
+TARGET straight;
+TARGET turning;
+TRAPEZOID Trapezoid_straight;
+TRAPEZOID Trapezoid_turning;
+MOLLIFIER Mollifier_turning;
+char modeacc;
+volatile char g_acc_flag;
+volatile char g_MotorEnd_flag;
+uint8_t g_FrontWallControl_mode;
+float mollifier_timer;
+char no_safty;
+char highspeed_mode;
 
 //入出力変数
 STACK_T g_Goal_x;
@@ -137,6 +183,9 @@ char error_mode;
 DIJKSTRA Dijkstra;
 uint16_t g_sensor_front,g_sensor_right,g_sensor_left;
 int x,y,direction;
+float straight_velocity_log[6000];
+float turning_velocity_log[6000];
+int log_num=0;
 
 void initStack_walk(STACK_T *stack){
 //	for(int i=0;i<=MAX_QUEUE_NUM-1;i++){
@@ -147,48 +196,648 @@ void initStack_walk(STACK_T *stack){
     stack->tail = 0;
 }
 
+void input_parameter(void) {
+
+	speed300_exploration.SlalomCentervelocity = 300;
+	speed300_exploration.TurnCentervelocity = 300;
+
+	speed300_exploration.slalom_R.g_speed =
+			speed300_exploration.SlalomCentervelocity;
+	speed300_exploration.slalom_R.t_speed = 980; //550
+	speed300_exploration.slalom_R.t_acc = 13000; //10000
+	speed300_exploration.slalom_R.f_ofset = 3; //55;
+	speed300_exploration.slalom_R.e_ofset = 24;
+
+	speed300_exploration.slalom_L.g_speed =
+			speed300_exploration.SlalomCentervelocity;
+	speed300_exploration.slalom_L.t_speed = 980;
+	speed300_exploration.slalom_L.t_acc = 13000;
+	speed300_exploration.slalom_L.f_ofset = 2; //50;
+	speed300_exploration.slalom_L.e_ofset = 24;
+}
+
+
 //  fake関数
 
 void pl_yellow_LED_count(unsigned char yy){}
 void pl_DriveMotor_standby(int pin){}
 void pl_DriveMotor_start(void){}
 void pl_DriveMotor_stop(void){}
+void pl_L_DriveMotor_mode(int l_motor_mode){}
+void pl_R_DriveMotor_mode(int r_motor_mode){}
 void record_in(void) {}
 void record_out(void) {}
-void wait_ms_NoReset(uint32_t waitTime) {}
 void maze_display(void) {}
 void maze_display_Dijkstra(void) {}
 void clear_Ierror(void) {}
 void reset_speed(void) {}
 void reset_gyro(void) {}
 void reset_distance(void) {}
+void wait_ms_NoReset(uint32_t waitTime) {
+    for(int i = 0;i < waitTime;i++){
+    straight_velocity_log[log_num+i]=0; 
+    turning_velocity_log[log_num+i]=0;
+    }
+    log_num=log_num + waitTime;
+}
+
+
+void cal_table(TRAPEZOID input,TARGET *target){
+float time_over;
+if (input.displacement>=0){
+	switch (g_acc_flag) {
+	case 0:
+		//速度FBなし
+		break;
+	case 1:
+		//加速(減速)
+			if (target->velocity >= input.count_velocity){
+				target->velocity = input.count_velocity;
+				target->acceleration = 0;
+				g_acc_flag=2;
+			}
+			else if((input.displacement <= (2*target->velocity*target->velocity
+					-input.start_velocity*input.start_velocity
+					-input.end_velocity*input.end_velocity)
+					/2/input.acceleration)){
+				time_over=((2*target->velocity*target->velocity
+						-input.start_velocity*input.start_velocity
+						-input.end_velocity*input.end_velocity)
+						/2/input.acceleration-input.displacement)/target->velocity;
+				target->displacement -= 1/2*INTERRUPT_TIME*input.acceleration*(2*time_over);
+				target->velocity -= input.acceleration*(2*time_over);
+
+				target->acceleration = -input.acceleration;
+				g_acc_flag=3;
+			}
+		break;
+	case 2:
+		//定常
+		if (input.displacement-target->displacement <=
+				(input.count_velocity*input.count_velocity
+						-input.end_velocity*input.end_velocity)/2/input.acceleration) {
+			time_over=(target->displacement+(input.count_velocity*input.count_velocity
+						-input.end_velocity*input.end_velocity)/2
+						/input.acceleration-input.displacement)/target->velocity;
+			target->displacement -= 1/2*INTERRUPT_TIME*input.acceleration*time_over;
+			target->velocity -= input.acceleration*(time_over);
+
+			target->acceleration = -input.acceleration;
+			g_acc_flag=3;
+		}
+		break;
+	case 3:
+		//減速(加速)
+		if (target->velocity <= input.end_velocity){
+			target->velocity = input.end_velocity;
+			target->acceleration = 0;
+			g_acc_flag=4;
+		}
+		break;
+	case 4:
+		//終了(0でもいいかも)
+		break;
+	case 5:
+		//加速のみ
+		if (target->displacement >= input.displacement){
+			target->acceleration = 0;
+			g_acc_flag=4;
+		}
+		break;
+	case 6:
+		//減速のみ
+		if (target->displacement >= input.displacement){
+			target->acceleration = 0;
+			g_acc_flag=4;
+		}
+		break;
+	}
+}else{
+	switch (g_acc_flag) {
+	case 0:
+		//速度FBなし
+		break;
+	case 1:
+		//加速(減速)
+			if (target->velocity <= input.count_velocity){
+				target->velocity = input.count_velocity;
+				target->acceleration = 0;
+				g_acc_flag=2;
+			}
+
+			else if((-input.displacement <= (2*target->velocity*target->velocity
+					-input.start_velocity*input.start_velocity
+					-input.end_velocity*input.end_velocity)
+					/2/input.acceleration)){
+				time_over=(-(2*target->velocity*target->velocity
+						-input.start_velocity*input.start_velocity
+						-input.end_velocity*input.end_velocity)
+						/2/input.acceleration-input.displacement)/target->velocity;
+				target->displacement += 1/2*INTERRUPT_TIME*input.acceleration*(2*time_over);
+				target->velocity += input.acceleration*(2*time_over);
+
+				target->acceleration = input.acceleration;
+				g_acc_flag=3;
+			}
+		break;
+	case 2:
+		//定常
+		if (-input.displacement+target->displacement <=
+				(input.count_velocity*input.count_velocity
+						-input.end_velocity*input.end_velocity)/2/input.acceleration) {
+			time_over=(target->displacement-(input.count_velocity*input.count_velocity
+						-input.end_velocity*input.end_velocity)/2
+						/input.acceleration-input.displacement)/target->velocity;
+			target->displacement += 1/2*INTERRUPT_TIME*input.acceleration*time_over;
+			target->velocity += input.acceleration*(time_over);
+
+			target->acceleration = input.acceleration;
+			g_acc_flag=3;
+		}
+		break;
+	case 3:
+		//減速(加速)
+		if (target->velocity >= input.end_velocity){
+			target->velocity = input.end_velocity;
+			target->acceleration = 0;
+			g_acc_flag=4;
+		}
+		break;
+	case 4:
+		//終了(0でもいいかも)
+		g_MotorEnd_flag=1;
+		break;
+	case 5:
+		//加速のみ
+		if (target->displacement <= input.displacement){
+			target->acceleration = 0;
+			g_acc_flag=4;
+		}
+		break;
+	case 6:
+		//減速のみ
+		if (target->displacement <= input.displacement){
+			target->acceleration = 0;
+			g_acc_flag=4;
+		}
+		break;
+	}
+
+}
+
+}
+
+float cal_mollifier_velocity(float t_now,float mollifier_T,float integral){
+	float velocity;
+	velocity=(2/mollifier_T)*integral/MOLLIFIER_INTEGRAL*exp(-mollifier_T*mollifier_T/4/(mollifier_T*mollifier_T/4-t_now*t_now));
+	return velocity;
+}
+float cal_mollifier_acceleration(float t_now,float mollifier_T,float integral){
+	float acceleration;
+	acceleration= integral/MOLLIFIER_INTEGRAL*(-mollifier_T*t_now/(mollifier_T*mollifier_T/4-t_now*t_now)/(mollifier_T*mollifier_T/4-t_now*t_now))*exp(-mollifier_T*mollifier_T/4/(mollifier_T*mollifier_T/4-t_now*t_now));
+	return acceleration;
+}
+
+
+void cal_mollifier_table(MOLLIFIER input,TARGET *target){
+
+float mollifier_T;
+float old_velocity;
+float time_delay=12;
+float time_delay2=-10;
+	mollifier_timer+=INTERRUPT_TIME;
+		mollifier_T=2*fabs(input.displacement)/MOLLIFIER_INTEGRAL*exp(-1)/input.max_turning_velocity;
+		if (mollifier_timer>-mollifier_T/2 && mollifier_timer<mollifier_T/2){
+			old_velocity=target->velocity;
+			target->velocity = cal_mollifier_velocity(mollifier_timer,mollifier_T,input.displacement);
+			if(target->velocity >=1950){
+				target->velocity=1950;
+			}
+			if(target->velocity <=-1950){
+				target->velocity=-1950;
+			}
+
+			if(mollifier_timer<-mollifier_T/2/1.316+time_delay*INTERRUPT_TIME){
+				target->acceleration = cal_mollifier_acceleration(-mollifier_T/2/1.316,mollifier_T,input.displacement);
+			}else if(mollifier_timer<0){
+				target->acceleration = cal_mollifier_acceleration(mollifier_timer-INTERRUPT_TIME*time_delay,mollifier_T,input.displacement);
+			}else if(mollifier_timer<mollifier_T/2/1.316+time_delay2*INTERRUPT_TIME){
+				target->acceleration = cal_mollifier_acceleration(mollifier_timer-INTERRUPT_TIME*time_delay,mollifier_T,input.displacement);
+			}else if(mollifier_timer<mollifier_T/2+time_delay2*INTERRUPT_TIME){
+				time_delay=0;
+				target->acceleration = cal_mollifier_acceleration(mollifier_T/2/1.316,mollifier_T,input.displacement);
+			}else{
+				target->acceleration = cal_mollifier_acceleration(mollifier_T/2-INTERRUPT_TIME,mollifier_T,input.displacement);
+			}
+//			if(mollifier_timer>-mollifier_T/2*0.35 && mollifier_timer<mollifier_T/2*0.45){
+//							target->acceleration = 0.7*target->acceleration;
+//			}
+//			if(mollifier_timer>mollifier_T/2*0.6){
+//							target->acceleration = 0.4*target->acceleration;
+//			}
+//			if(mollifier_timer>mollifier_T/2*0.9){
+//							target->acceleration = -0.6*target->acceleration;
+//			}
+		}else{
+			old_velocity=target->velocity;
+			target->velocity=0;
+			target->acceleration = -target->velocity+old_velocity;
+			g_acc_flag=4;
+
+		}
+
+}
+
+
+
+
 
 void straight_table2(float input_displacement, float input_start_velocity,
 	float input_end_velocity, float input_count_velocity, float input_acceleration,MOTOR_MODE motor_mode) {
+	float MinRequired_displacement=
+			(input_end_velocity*input_end_velocity
+					-input_start_velocity*input_start_velocity
+					)/2/input_acceleration;
+	// 例外処理
+	if (input_acceleration < 0){input_acceleration=-input_acceleration;}//加速が負
+
+	Trapezoid_straight.displacement = input_displacement;
+	Trapezoid_straight.start_velocity = input_start_velocity;
+	Trapezoid_straight.end_velocity = input_end_velocity;
+	Trapezoid_straight.count_velocity = input_count_velocity;
+	Trapezoid_straight.acceleration = input_acceleration;
+    	if (input_count_velocity>=0){straight.acceleration = input_acceleration;
+	}else{straight.acceleration = -input_acceleration;}
+
+    straight.velocity = input_start_velocity;
+	straight.displacement = 0;
+	turning.velocity = 0;
+	turning.acceleration = 0;
+	turning.displacement = 0;
+	g_MotorEnd_flag=0;
+	g_acc_flag=1;
+		if (input_displacement>0 && MinRequired_displacement>input_displacement){g_acc_flag=5;straight.acceleration = input_acceleration;}
+		if (input_displacement>0 && MinRequired_displacement<-input_displacement){g_acc_flag=6;straight.acceleration = -input_acceleration;}
+		if (input_displacement<0 && MinRequired_displacement>-input_displacement){g_acc_flag=5;straight.acceleration = -input_acceleration;}
+		if (input_displacement<0 && MinRequired_displacement<input_displacement){g_acc_flag=6;straight.acceleration = input_acceleration;}
+	modeacc = 1;
+	g_WallControl_mode=motor_mode.WallControlMode;
+	pl_DriveMotor_start();
+
+	while (g_acc_flag!=4){
+        straight.displacement += straight.velocity*INTERRUPT_TIME + straight.acceleration*INTERRUPT_TIME*INTERRUPT_TIME/2;
+		straight.velocity += straight.acceleration*INTERRUPT_TIME;
+		turning.displacement += turning.velocity*INTERRUPT_TIME + turning.acceleration*INTERRUPT_TIME*INTERRUPT_TIME/2;
+		turning.velocity += turning.acceleration*INTERRUPT_TIME;
+		cal_table(Trapezoid_straight,&straight);
+        straight_velocity_log[log_num]=straight.velocity;
+        turning_velocity_log[log_num]=turning.velocity;
+         log_num++;
+	}
+	if(input_end_velocity==0){//BREAK
+		wait_ms_NoReset(100);
+		modeacc = 0;
+		pl_R_DriveMotor_mode(MOTOR_BREAK);
+		pl_L_DriveMotor_mode(MOTOR_BREAK);
+		pl_DriveMotor_stop();//これは必要か？
+		wait_ms_NoReset(100);
+	}
+
+
 
 }
+
 void End_straight(float input_displacement,MOTOR_MODE motor_mode,_Bool right_wall,_Bool left_wall){
 	
 }
 
 float turning_table2(float input_displacement, float input_start_velocity,
 	float input_end_velocity, float input_count_velocity, float input_acceleration) {
+	float MinRequired_displacement=
+			(input_end_velocity*input_end_velocity
+					-input_start_velocity*input_start_velocity
+					)/2/input_acceleration;
+	// 例外処理
+	if (input_acceleration < 0){input_acceleration=-input_acceleration;}//加速が負
+
+	Trapezoid_turning.displacement = input_displacement;
+	Trapezoid_turning.start_velocity = input_start_velocity;
+	Trapezoid_turning.end_velocity = input_end_velocity;
+	Trapezoid_turning.count_velocity = input_count_velocity;
+	Trapezoid_turning.acceleration = input_acceleration;
+
+	if (input_count_velocity>=0){turning.acceleration = input_acceleration;
+	}else{turning.acceleration = -input_acceleration;}
+	turning.velocity = input_start_velocity;
+	turning.displacement = 0;
+	straight.velocity = 0;
+	straight.acceleration = 0;
+	straight.displacement = 0;
+	g_MotorEnd_flag=0;
+	g_acc_flag=1;
+		if (input_displacement>0 && MinRequired_displacement>input_displacement){g_acc_flag=5;turning.acceleration = input_acceleration;}
+		if (input_displacement>0 && MinRequired_displacement<-input_displacement){g_acc_flag=6;turning.acceleration = -input_acceleration;}
+		if (input_displacement<0 && MinRequired_displacement>-input_displacement){g_acc_flag=5;turning.acceleration = -input_acceleration;}
+		if (input_displacement<0 && MinRequired_displacement<input_displacement){g_acc_flag=6;turning.acceleration = input_acceleration;}
+	modeacc = 2;
+
+	pl_DriveMotor_start();
+	while (g_acc_flag!=4){
+		straight.displacement += straight.velocity*INTERRUPT_TIME + straight.acceleration*INTERRUPT_TIME*INTERRUPT_TIME/2;
+		straight.velocity += straight.acceleration*INTERRUPT_TIME;
+		turning.displacement += turning.velocity*INTERRUPT_TIME + turning.acceleration*INTERRUPT_TIME*INTERRUPT_TIME/2;
+		turning.velocity += turning.acceleration*INTERRUPT_TIME;
+		cal_table(Trapezoid_turning,&turning);
+        straight_velocity_log[log_num]=straight.velocity;
+        turning_velocity_log[log_num]=turning.velocity;
+         log_num++;
+	}
+	if(input_end_velocity==0){//BREAK
+		wait_ms_NoReset(300);
+		modeacc = 0;
+		pl_R_DriveMotor_mode(MOTOR_BREAK);
+		pl_L_DriveMotor_mode(MOTOR_BREAK);
+		wait_ms_NoReset(100);
+	}
+//	modeacc = 0;
+
+	pl_DriveMotor_stop();
+}
+
+
+
+float slalom_table2(float input_center_velocity,float input_displacement, float input_start_velocity,
+	float input_end_velocity, float input_count_velocity, float input_acceleration) {
+
+	float MinRequired_displacement=
+			(input_end_velocity*input_end_velocity
+					-input_start_velocity*input_start_velocity
+					)/2/input_acceleration;
+	// 例外処理
+	if (input_acceleration < 0){input_acceleration=-input_acceleration;}//加速が負
+
+	Trapezoid_turning.displacement = input_displacement;
+	Trapezoid_turning.start_velocity = input_start_velocity;
+	Trapezoid_turning.end_velocity = input_end_velocity;
+	Trapezoid_turning.count_velocity = input_count_velocity;
+	Trapezoid_turning.acceleration = input_acceleration;
+
+	if (input_count_velocity>=0){turning.acceleration = input_acceleration;
+	}else{turning.acceleration = -input_acceleration;}
+	turning.velocity = input_start_velocity;
+	turning.displacement = 0;
+	straight.velocity = input_center_velocity;
+	straight.acceleration = 0;
+	straight.displacement = 0;
+	g_MotorEnd_flag=0;
+	g_acc_flag=1;
+		if (input_displacement>0 && MinRequired_displacement>input_displacement){g_acc_flag=5;turning.acceleration = input_acceleration;}
+		if (input_displacement>0 && MinRequired_displacement<-input_displacement){g_acc_flag=6;turning.acceleration = -input_acceleration;}
+		if (input_displacement<0 && MinRequired_displacement>-input_displacement){g_acc_flag=5;turning.acceleration = -input_acceleration;}
+		if (input_displacement<0 && MinRequired_displacement<input_displacement){g_acc_flag=6;turning.acceleration = input_acceleration;}
+	modeacc = 4;
+//	enc.sigma_error=0;
+	pl_DriveMotor_start();
+	while (g_acc_flag!=4){
+		straight.displacement += straight.velocity*INTERRUPT_TIME + straight.acceleration*INTERRUPT_TIME*INTERRUPT_TIME/2;
+		straight.velocity += straight.acceleration*INTERRUPT_TIME;
+		turning.displacement += turning.velocity*INTERRUPT_TIME + turning.acceleration*INTERRUPT_TIME*INTERRUPT_TIME/2;
+		turning.velocity += turning.acceleration*INTERRUPT_TIME;
+		cal_table(Trapezoid_turning,&turning);
+        straight_velocity_log[log_num]=straight.velocity;
+        turning_velocity_log[log_num]=turning.velocity;
+         log_num++;
+	}
+	pl_DriveMotor_stop();
+
+}
+
+void mollifier_slalom_table(float input_center_velocity,float input_displacement, float input_max_turning_velocity) {
+
+	// 例外処理
+
+	Mollifier_turning.center_velocity = input_center_velocity;
+	Mollifier_turning.displacement = input_displacement;
+	Mollifier_turning.max_turning_velocity = input_max_turning_velocity;
+
+
+	turning.velocity = 0;
+	turning.displacement = 0;
+	straight.velocity = input_center_velocity;
+	straight.acceleration = 0;
+	straight.displacement = 0;
+	g_MotorEnd_flag=0;
+	g_acc_flag=1;
+	mollifier_timer=-fabs(input_displacement)/MOLLIFIER_INTEGRAL*exp(-1)/input_max_turning_velocity;
+	modeacc = 6;
+
+	pl_DriveMotor_start();
+	while (g_acc_flag!=4){
+		straight.displacement += straight.velocity*INTERRUPT_TIME + straight.acceleration*INTERRUPT_TIME*INTERRUPT_TIME/2;
+		straight.velocity += straight.acceleration*INTERRUPT_TIME;
+		turning.displacement += turning.velocity*INTERRUPT_TIME;// + turning.acceleration*INTERRUPT_TIME*INTERRUPT_TIME/2;
+		cal_mollifier_table(Mollifier_turning,&turning);//角速度と角加速度はここで決定
+        straight_velocity_log[log_num]=straight.velocity;
+        turning_velocity_log[log_num]=turning.velocity;
+         log_num++;
+	}
+//	modeacc = 0;
+
+
+
+	pl_DriveMotor_stop();
 
 }
 
 
-void backTurn_controlWall(float input_TurningVelocity,float input_TurningAcceleration,_Bool front_wall,_Bool left_wall,_Bool right_wall){
+void no_frontwall_straight(void){
+	turning.acceleration = 0;
+	turning.velocity = 0;
+	turning.displacement = 0;
+	straight.velocity = 0;
+	straight.acceleration = 0;
+	straight.displacement = 0;
 
+	g_FrontWallControl_mode=1;
+	modeacc = 5;
+
+	pl_DriveMotor_start();
+	wait_ms_NoReset(150);
+
+	g_FrontWallControl_mode=0;
+	modeacc = 0;
+
+	pl_DriveMotor_stop();
+
+}
+
+
+
+
+void backTurn_controlWall(float input_TurningVelocity,float input_TurningAcceleration,_Bool front_wall,_Bool left_wall,_Bool right_wall){
+no_safty = 1;
+	if(front_wall){
+		no_frontwall_straight();
+		pl_R_DriveMotor_mode(MOTOR_BREAK);
+		pl_L_DriveMotor_mode(MOTOR_BREAK);
+		//clear_Ierror();
+		wait_ms_NoReset(50);
+	}
+	if(left_wall){
+		turning_table2(90,0,0,input_TurningVelocity,input_TurningAcceleration);
+		pl_R_DriveMotor_mode(MOTOR_BREAK);
+		pl_L_DriveMotor_mode(MOTOR_BREAK);
+		wait_ms_NoReset(50);
+		no_frontwall_straight();
+		pl_R_DriveMotor_mode(MOTOR_BREAK);
+		pl_L_DriveMotor_mode(MOTOR_BREAK);
+		//clear_Ierror();
+		wait_ms_NoReset(50);
+		turning_table2(90,0,0,input_TurningVelocity,input_TurningAcceleration);
+	}else if(left_wall==0 && right_wall){
+		turning_table2(-90,0,0,-input_TurningVelocity,input_TurningAcceleration);
+		pl_R_DriveMotor_mode(MOTOR_BREAK);
+		pl_L_DriveMotor_mode(MOTOR_BREAK);
+		wait_ms_NoReset(50);
+		no_frontwall_straight();
+		pl_R_DriveMotor_mode(MOTOR_BREAK);
+		pl_L_DriveMotor_mode(MOTOR_BREAK);
+		//clear_Ierror();
+		wait_ms_NoReset(50);
+		turning_table2(-90,0,0,-input_TurningVelocity,input_TurningAcceleration);
+	}else if(left_wall==0 && right_wall==0){
+		turning_table2(90,0,0,input_TurningVelocity,input_TurningAcceleration);
+		pl_R_DriveMotor_mode(MOTOR_BREAK);
+		pl_L_DriveMotor_mode(MOTOR_BREAK);
+		wait_ms_NoReset(50);
+		turning_table2(90,0,0,input_TurningVelocity,input_TurningAcceleration);
+	}
+	pl_R_DriveMotor_mode(MOTOR_BREAK);
+	pl_L_DriveMotor_mode(MOTOR_BREAK);
+	wait_ms_NoReset(150);
+	no_safty = 0;
 }
 
 
 void slalomR(parameter turnpara,char test_mode,char shortest_mode,char mollifier_mode,float end_velocity) {
-
+MOTOR_MODE wallmode;
+	if (test_mode == ON) {
+		highspeed_mode = 0;
+		wallmode.WallControlMode=1;
+		wallmode.WallControlStatus=0;
+		wallmode.WallCutMode=0;
+		wallmode.calMazeMode=0;
+		if(shortest_mode==0){
+			straight_table2(BACK_TO_CENTER + 135, 0, turnpara.g_speed, turnpara.g_speed,
+					turnpara.g_speed * turnpara.g_speed  / 2 / 45,wallmode);
+		}else{
+			straight_table2(BACK_TO_CENTER_FRONT + 135, 0, turnpara.g_speed, turnpara.g_speed,
+					turnpara.g_speed * turnpara.g_speed  / 2 / 45,wallmode);
+		}
+		wallmode.WallCutMode=1;
+		wallmode.WallControlMode=0;
+		if(shortest_mode==0){
+			straight_table2(MAZE_OFFSET+turnpara.f_ofset, turnpara.g_speed, turnpara.g_speed, turnpara.g_speed,
+									turnpara.g_speed * turnpara.g_speed  / 2 / 45,wallmode);
+		}else{
+			straight_table2(turnpara.f_ofset, turnpara.g_speed, turnpara.g_speed, turnpara.g_speed,
+									turnpara.g_speed * turnpara.g_speed  / 2 / 45,wallmode);
+		}
+		if(mollifier_mode == ON){
+			mollifier_slalom_table(turnpara.g_speed,-90,turnpara.t_speed);
+		}else{
+			slalom_table2(turnpara.g_speed,-90, 0, 0, -turnpara.t_speed, turnpara.t_acc);
+		}
+		wallmode.WallControlMode=0;
+		wallmode.WallCutMode=0;
+		straight_table2(45 + turnpara.e_ofset, turnpara.g_speed, 0, turnpara.g_speed,
+						turnpara.g_speed * turnpara.g_speed  / 2 / 45,wallmode);
+		highspeed_mode = 0;
+	} else {
+		wallmode.WallControlMode=OFFSET_CONTROL_IN_SLALOM;
+		wallmode.WallControlStatus=0;
+		wallmode.WallCutMode=1;
+		wallmode.calMazeMode=0;
+		if(shortest_mode==0){
+			straight_table2(MAZE_OFFSET+turnpara.f_ofset, turnpara.g_speed, turnpara.g_speed, turnpara.g_speed,
+														turnpara.g_speed * turnpara.g_speed  / 2 / 45,wallmode);
+		}else{
+			straight_table2(turnpara.f_ofset, turnpara.g_speed, turnpara.g_speed, turnpara.g_speed,
+														turnpara.g_speed * turnpara.g_speed  / 2 / 45,wallmode);
+		}
+		if(mollifier_mode == ON){
+			mollifier_slalom_table(turnpara.g_speed,-90,turnpara.t_speed);
+		}else{
+			slalom_table2(turnpara.g_speed,-90, 0, 0, -turnpara.t_speed, turnpara.t_acc);
+		}
+		wallmode.WallControlMode=OFFSET_CONTROL_OUT_SLALOM;
+		wallmode.WallCutMode=0;
+		straight_table2(turnpara.e_ofset, turnpara.g_speed, end_velocity, end_velocity,
+								fabs(turnpara.g_speed * turnpara.g_speed-end_velocity*end_velocity)  / 2 / turnpara.e_ofset+1000,wallmode);
+//		straight_table2(turnpara.e_ofset, turnpara.g_speed, end_velocity, end_velocity,
+//										fabs(end_velocity*end_velocity-turnpara.g_speed * turnpara.g_speed)  / 2 / turnpara.e_ofset,wallmode);
+	}
 }
 
 void slalomL(parameter turnpara,char test_mode,char shortest_mode,char mollifier_mode,float end_velocity) {
+	MOTOR_MODE wallmode;
+	if (test_mode == ON) {
+		highspeed_mode = 0;
+		wallmode.WallControlMode=1;
+		wallmode.WallControlStatus=0;
+		wallmode.WallCutMode=0;
+		wallmode.calMazeMode=0;
+		if(shortest_mode==0){
+			straight_table2(BACK_TO_CENTER + 135, 0, turnpara.g_speed, turnpara.g_speed,
+					turnpara.g_speed * turnpara.g_speed  / 2 / 45,wallmode);
+		}else{
+			straight_table2(BACK_TO_CENTER_FRONT + 135, 0, turnpara.g_speed, turnpara.g_speed,
+					turnpara.g_speed * turnpara.g_speed  / 2 / 45,wallmode);
+		}
+		wallmode.WallControlMode=OFFSET_CONTROL_IN_SLALOM;
+		wallmode.WallCutMode=1;
+		if(shortest_mode==0){
+			straight_table2(MAZE_OFFSET+turnpara.f_ofset, turnpara.g_speed, turnpara.g_speed, turnpara.g_speed,
+									turnpara.g_speed * turnpara.g_speed  / 2 / 45,wallmode);
+		}else{
+			straight_table2(turnpara.f_ofset, turnpara.g_speed, turnpara.g_speed, turnpara.g_speed,
+									turnpara.g_speed * turnpara.g_speed  / 2 / 45,wallmode);
+		}
+		if(mollifier_mode == ON){
+			mollifier_slalom_table(turnpara.g_speed,90,turnpara.t_speed);
+		}else{
+			slalom_table2(turnpara.g_speed,90, 0, 0, turnpara.t_speed, turnpara.t_acc);
+		}
+		wallmode.WallControlMode=OFFSET_CONTROL_OUT_SLALOM;
+		wallmode.WallCutMode=0;
+		straight_table2(45 + turnpara.e_ofset, turnpara.g_speed, 0, turnpara.g_speed,
+						turnpara.g_speed * turnpara.g_speed  / 2 / 45,wallmode);
+		highspeed_mode = 0;
+	} else {
+		wallmode.WallControlMode=0;
+		wallmode.WallControlStatus=0;
+		wallmode.WallCutMode=1;
+		wallmode.calMazeMode=0;
+		if(shortest_mode==0){
+			straight_table2(MAZE_OFFSET+turnpara.f_ofset, turnpara.g_speed, turnpara.g_speed, turnpara.g_speed,
+														turnpara.g_speed * turnpara.g_speed  / 2 / 45,wallmode);
+		}else{
+			straight_table2(turnpara.f_ofset, turnpara.g_speed, turnpara.g_speed, turnpara.g_speed,
+														turnpara.g_speed * turnpara.g_speed  / 2 / 45,wallmode);
+		}
+		if(mollifier_mode == ON){
+			mollifier_slalom_table(turnpara.g_speed,90,turnpara.t_speed);
+		}else{
+			slalom_table2(turnpara.g_speed,90, 0, 0, turnpara.t_speed, turnpara.t_acc);
+		}
+		wallmode.WallControlMode=0;
+		wallmode.WallCutMode=0;
+		straight_table2(turnpara.e_ofset, turnpara.g_speed, end_velocity, end_velocity,
+								fabs(turnpara.g_speed * turnpara.g_speed-end_velocity*end_velocity)  / 2 / turnpara.e_ofset+1000,wallmode);
 
+	}
 }
+
 
 
 void get_wallData_sensor(_Bool* front_wall,_Bool* right_wall,_Bool* left_wall){
@@ -1695,7 +2344,8 @@ void mexFunction( int nlhs, mxArray *plhs[],
   int coordinate[3];
   char all_mode[2];
   size_t bytes_to_copy;
-
+    double *outMatrix1;              /* output matrix */
+ double *outMatrix2;  
 
    uint32_t log_row[15];
    uint32_t log_column[15];
@@ -1754,6 +2404,8 @@ void mexFunction( int nlhs, mxArray *plhs[],
     Dijkstra_maker_flag = *Dijkstra_maker;
     error_mode = *Error;
   /* call the computational subroutine */
+        log_num=0;
+    input_parameter();
     AdatiWayReturn(300,400,2000,3000,speed300_exploration,1,1);
     for(int t=0;t<15;t++){
         log_row[t] = wall.row[t];
@@ -1826,5 +2478,20 @@ void mexFunction( int nlhs, mxArray *plhs[],
     all_mode[1]=error_mode;
   memcpy(start_of_pr,all_mode,bytes_to_copy);  
 
+       /* create a 2-by-2 array of unsigned 16-bit integers */
+    plhs[9] = mxCreateDoubleMatrix(1,(mwSize)(log_num+1),mxREAL);
+    outMatrix1 = mxGetPr(plhs[9]);
+    straight_velocity_log[log_num]=(float)(log_num)*INTERRUPT_TIME;
+    for (int index = 0; index < log_num+1; index++) {
+        outMatrix1[index] = straight_velocity_log[index];
+    }
+
+           /* create a 2-by-2 array of unsigned 16-bit integers */
+    plhs[10] = mxCreateDoubleMatrix(1,(mwSize)(log_num+1),mxREAL);
+    outMatrix2 = mxGetPr(plhs[10]);
+    turning_velocity_log[log_num]=(float)(log_num)*INTERRUPT_TIME;
+    for (int index = 0; index < log_num+1; index++) {
+        outMatrix2[index] = turning_velocity_log[index];
+    }
 
 }
