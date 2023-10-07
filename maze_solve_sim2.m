@@ -42,7 +42,7 @@ run_mode1_flg =  run_mode1.search;
 run_mode2_flg = run_mode2.adachi;
 %% 迷路パラメータ設定(手入力)
 % global maze_goal
-maze_goal = uint8(zeros(9,2));
+
 
 %指定する迷路に合わせてゴール座標、サイズを変更
 %大会名　　　x  y size
@@ -58,18 +58,11 @@ maze_goal = uint8(zeros(9,2));
 %no_test4 6 9 4
 %no_test5 7 7 4
 
-goal_x = 6;%610;%ゴール左下のx座標
-goal_y = 9;%911;%ゴール左下のy座標
+goal_x = 17;%610;%ゴール左下のx座標
+goal_y = 13;%911;%ゴール左下のy座標
 goal_size = uint8(4);%ゴールサイズを入力する
 
 goal_size_d = double(goal_size);
-
-%ゴール座標入力
-for i = 1:sqrt(goal_size_d)
-    for l = 1:sqrt(goal_size_d)
-        maze_goal((l-1)*sqrt(goal_size_d)+i,:) = [goal_x+(i-1),goal_y+(l-1)]+1;
-    end
-end
 
 
 %% 迷路データ取得
@@ -89,7 +82,7 @@ else
 maze_data_to_serial_in(maze_row_size,maze_col_size);
 end
 
-g_walk_count=cal_walkcount_queue(g_maze_row,g_maze_column,uint32(goal_x),uint32(goal_y));
+%g_walk_count=cal_walkcount_queue(g_maze_row,g_maze_column,uint32(goal_x),uint32(goal_y));
 %% 迷路をプロット
 
 %プロットするfigure,axisを定義
@@ -126,7 +119,7 @@ Error = uint8(0);
 all_mode=[Dijkstra_maker;Error];
 D_row_map=uint16(zeros(16,15));
 D_column_map=uint16(zeros(16,15));
-maze_data_plot2_solve(wall_row,maze_row_size,wall_column,maze_col_size,coordinate(1),coordinate(2),coordinate(3));
+maze_data_plot2_solve_0(wall_row,maze_row_size,wall_column,maze_col_size,coordinate(1),coordinate(2),coordinate(3));
 
 Straight_all=[];
 Turning_all=[];
@@ -134,7 +127,7 @@ T_all=0;
 
 while (1)%Dijkstra_maker,Error
 
-    [Sensor_front,Sensor_right,Sensor_left]=maze_get_wall(coordinate(1),coordinate(2),coordinate(3),g_maze_row,g_maze_column);
+    [Sensor_front,Sensor_right,Sensor_left]=maze_get_wall(coordinate(1),coordinate(2),coordinate(3),g_maze_row,g_maze_column,maze_row_size,maze_col_size);
 
     wall_row_0=wall_row;
     wall_column_0 =wall_column;
@@ -161,7 +154,7 @@ end
 T_all
 while (1)%Dijkstra_maker,Error
 
-    [Sensor_front,Sensor_right,Sensor_left]=maze_get_wall(coordinate(1),coordinate(2),coordinate(3),g_maze_row,g_maze_column);
+    [Sensor_front,Sensor_right,Sensor_left]=maze_get_wall(coordinate(1),coordinate(2),coordinate(3),g_maze_row,g_maze_column,maze_row_size,maze_col_size);
 
     wall_row_0=wall_row;
     wall_column_0 =wall_column;

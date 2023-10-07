@@ -9,7 +9,7 @@
  */
 
 
-#define MAZE_SQUARE_NUM 16
+#define MAZE_SQUARE_NUM 32
 
 #define NDIMS 2
 #define TOTAL_ELEMENTS0 (MAZE_SQUARE_NUM-1)
@@ -26,7 +26,7 @@
 #define MAX_QUEUE_NUM 4000
 #define ROW 0
 #define COLUMN 1
-#define MAX_WALKCOUNT 255
+#define MAX_WALKCOUNT 65535
 #define MAX_WALKCOUNT_DIJKSTRA 65535
 #define ON 1
 #define OFF 0
@@ -1413,10 +1413,10 @@ void create_StepCountMap_queue(void){
 	pushStack_walk(&stack_x,GOAL_X + 1);pushStack_walk(&stack_y,GOAL_Y + 1);
 	//printf("(%d,%d),(%d,%d),(%d,%d),(%d,%d)\n",stack_x.data[0],stack_y.data[0],stack_x.data[1],stack_y.data[1],stack_x.data[2],stack_y.data[2],stack_x.data[3],stack_y.data[3]);
 	//printf("x head %d tail %d\n y head %d tail %d\n",stack_x.head,stack_x.tail,stack_y.head,stack_y.tail);
-	unsigned short count_number = 1;
-	unsigned short Xcoordinate,Ycoordinate;
-	unsigned short wall_north=1,wall_south=1,wall_east=1,wall_west=1;
-	while (count_number <= 254) {
+	uint16_t count_number = 1;
+	uint16_t Xcoordinate,Ycoordinate;
+	uint32_t wall_north=1,wall_south=1,wall_east=1,wall_west=1;
+	while (count_number <= MAZE_SQUARE_NUM*MAZE_SQUARE_NUM-2) {
 
 		Xcoordinate = popStack_walk(&stack_x);
 		Ycoordinate = popStack_walk(&stack_y);
@@ -1483,11 +1483,10 @@ void create_StepCountMapBack_queue(void){
 	pushStack_walk(&stack_x,0);pushStack_walk(&stack_y,0);
 	//printf("(%d,%d),(%d,%d),(%d,%d),(%d,%d)\n",stack_x.data[0],stack_y.data[0],stack_x.data[1],stack_y.data[1],stack_x.data[2],stack_y.data[2],stack_x.data[3],stack_y.data[3]);
 	//printf("x head %d tail %d\n y head %d tail %d\n",stack_x.head,stack_x.tail,stack_y.head,stack_y.tail);
-	unsigned short coordinate;
-	unsigned short count_number = 1;
-	unsigned short Xcoordinate,Ycoordinate;
-	unsigned short wall_north=1,wall_south=1,wall_east=1,wall_west=1;
-	while (count_number <= 254) {
+	uint16_t count_number = 1;
+	uint16_t Xcoordinate,Ycoordinate;
+	uint32_t wall_north=1,wall_south=1,wall_east=1,wall_west=1;
+	while (count_number <= MAZE_SQUARE_NUM*MAZE_SQUARE_NUM-2) {
 
 		Xcoordinate = popStack_walk(&stack_x);
 		Ycoordinate = popStack_walk(&stack_y);
@@ -1579,10 +1578,10 @@ void create_StepCountMap_unknown(void){
 	}
 	//printf("(%d,%d),(%d,%d),(%d,%d),(%d,%d)\n",stack_x.data[0],stack_y.data[0],stack_x.data[1],stack_y.data[1],stack_x.data[2],stack_y.data[2],stack_x.data[3],stack_y.data[3]);
 	//printf("x head %d tail %d\n y head %d tail %d\n",stack_x.head,stack_x.tail,stack_y.head,stack_y.tail);
-	unsigned short count_number = 1;
-	unsigned short Xcoordinate,Ycoordinate;
-	unsigned short wall_north=1,wall_south=1,wall_east=1,wall_west=1;
-	while (count_number <= 254) {
+	uint16_t count_number = 1;
+	uint16_t Xcoordinate,Ycoordinate;
+	uint32_t wall_north=1,wall_south=1,wall_east=1,wall_west=1;
+	while (count_number <= MAZE_SQUARE_NUM*MAZE_SQUARE_NUM-2) {
 
 		Xcoordinate = popStack_walk(&stack_x);
 		Ycoordinate = popStack_walk(&stack_y);
