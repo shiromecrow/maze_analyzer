@@ -1,0 +1,337 @@
+#include <string.h> /* needed for memcpy() */
+#include <stdint.h> /* needed for memcpy() */
+#include "mex.h"
+
+/*
+ * run_maze_solve.c - example found in API guide
+ *
+ */
+
+
+#define NDIMS 2
+#define TOTAL_ELEMENTS0 15
+#define TOTAL_ELEMENTS1 3
+#define TOTAL_ELEMENTS2 256
+#define TOTAL_ELEMENTS3 240
+#define TOTAL_ELEMENTS4 1
+
+
+#define MAX_QUEUE_NUM 1000
+#define ROW 0
+#define COLUMN 1
+#define MAX_WALKCOUNT 255
+#define MAX_WALKCOUNT_DIJKSTRA 65535
+#define ON 1
+#define OFF 0
+#define MAZE_SECTION 90
+#define MAZE_OFFSET 8
+#define BACK_TO_CENTER 20.5
+#define BACK_TO_CENTER_FRONT 12.5
+#define BACK_TO_CENTER_SLANT 42.5
+#define BACK_TO_CENTER_FRONT_SLANT 34.5
+#define EXPLORATION 0
+#define SHORTEST 1
+
+
+
+#define VERTICALCOST 180
+#define DIAGONALCOST 127
+#define MIN_VERTICALCOST 12
+#define MIN_DIAGONALCOST 10
+#define DISCOUNTCOST_V 1//絶対1
+#define DISCOUNTCOST_D 1//絶対1
+#define V_NUM_MAX 5
+#define D_NUM_MAX 6
+
+#define SLANT_NORTH 0
+#define SLANT_NORTH_EAST 1
+#define SLANT_EAST 2
+#define SLANT_SOUTH_EAST 3
+#define SLANT_SOUTH 4
+#define SLANT_SOUTH_WEST 5
+#define SLANT_WEST 6
+#define SLANT_NORTH_WEST 7
+
+typedef struct{
+	uint32_t row[15];
+	uint32_t column[15];
+	uint32_t row_look[15];
+	uint32_t column_look[15];
+
+}WALL;
+
+typedef struct{
+	uint16_t row_count[16][15];
+	uint16_t column_count[16][15];
+}DIJKSTRA;
+
+
+
+
+//合わせるように定義
+WALL wall;
+
+//入出力変数
+uint16_t g_sensor_front,g_sensor_right,g_sensor_left;
+int x,y,direction;
+DIJKSTRA Dijkstra;
+
+
+void get_wall(int x,int y,int direction,_Bool* front_wall,_Bool* right_wall,_Bool* left_wall){
+	*front_wall=1;
+	*right_wall=1;
+	*left_wall=1;
+	switch (direction) {
+	case 1:
+		if (y <= 14) {
+			*front_wall=((wall.row[y] & (1 << x)) == (1 << x));
+		}
+		if (x >= 1) {
+			*left_wall=((wall.column[x - 1] & (1 << y)) == (1 << y));
+		}
+		if (x <= 14) {
+			*right_wall=((wall.column[x] & (1 << y)) == (1 << y));
+		}
+		break;
+	case 2:
+		if (x <= 14) {
+			*front_wall=((wall.column[x] & (1 << y)) == (1 << y));
+		}
+		if (y <= 14) {
+			*left_wall=((wall.row[y] & (1 << x)) == (1 << x));
+		}
+		if (y >= 1) {
+			*right_wall=((wall.row[y - 1] & (1 << x)) == (1 << x));
+		}
+		break;
+	case 3:
+		if (y >= 1) {
+			*front_wall=((wall.row[y - 1] & (1 << x)) == (1 << x));
+		}
+		if (x <= 14) {
+			*left_wall=((wall.column[x] & (1 << y)) == (1 << y));
+		}
+		if (x >= 1) {
+			*right_wall=((wall.column[x - 1] & (1 << y)) == (1 << y));
+		}
+		break;
+	case 4:
+		if (x >= 1) {
+			*front_wall=((wall.column[x - 1] & (1 << y)) == (1 << y));
+		}
+		if (y >= 1) {
+			*left_wall=((wall.row[y - 1] & (1 << x)) == (1 << x));
+		}
+		if (y <= 14) {
+			*right_wall=((wall.row[y] & (1 << x)) == (1 << x));
+		}
+		break;
+	}
+
+}
+
+
+void get_wall_look(int x,int y,int direction,_Bool* front_wall,_Bool* right_wall,_Bool* left_wall){
+	*front_wall=1;
+	*right_wall=1;
+	*left_wall=1;
+	switch (direction) {
+	case 1:
+		if (y <= 14) {
+			*front_wall=((wall.row_look[y] & (1 << x)) == (1 << x));
+		}
+		if (x >= 1) {
+			*left_wall=((wall.column_look[x - 1] & (1 << y)) == (1 << y));
+		}
+		if (x <= 14) {
+			*right_wall=((wall.column_look[x] & (1 << y)) == (1 << y));
+		}
+		break;
+	case 2:
+		if (x <= 14) {
+			*front_wall=((wall.column_look[x] & (1 << y)) == (1 << y));
+		}
+		if (y <= 14) {
+			*left_wall=((wall.row_look[y] & (1 << x)) == (1 << x));
+		}
+		if (y >= 1) {
+			*right_wall=((wall.row_look[y - 1] & (1 << x)) == (1 << x));
+		}
+		break;
+	case 3:
+		if (y >= 1) {
+			*front_wall=((wall.row_look[y - 1] & (1 << x)) == (1 << x));
+		}
+		if (x <= 14) {
+			*left_wall=((wall.column_look[x] & (1 << y)) == (1 << y));
+		}
+		if (x >= 1) {
+			*right_wall=((wall.column_look[x - 1] & (1 << y)) == (1 << y));
+		}
+		break;
+	case 4:
+		if (x >= 1) {
+			*front_wall=((wall.column_look[x - 1] & (1 << y)) == (1 << y));
+		}
+		if (y >= 1) {
+			*left_wall=((wall.row_look[y - 1] & (1 << x)) == (1 << x));
+		}
+		if (y <= 14) {
+			*right_wall=((wall.row_look[y] & (1 << x)) == (1 << x));
+		}
+		break;
+	}
+
+}
+
+
+/* the gateway function */
+void mexFunction( int nlhs, mxArray *plhs[],
+                  int nrhs, const mxArray *prhs[] )
+{
+  const mwSize dims0[]={15,1};
+  const mwSize dims1[]={3,1};
+  const mwSize dims2[]={16,16};
+  const mwSize dims3[]={16,15};
+  const mwSize dims4[]={1,1};
+  unsigned char *start_of_pr;
+  unsigned short data[]={1,2,3,4};
+  int coordinate[3];
+  size_t bytes_to_copy;
+
+
+   uint32_t log_row[15];
+   uint32_t log_column[15];
+   uint32_t log_row_look[15];
+   uint32_t log_column_look[15];
+   uint32_t log_goal_x;
+   uint32_t log_goal_y;
+   int log_X;
+   int log_Y;
+   int log_Direction;
+   uint16_t log_Sensor_front;
+   uint16_t log_Sensor_right;
+   uint16_t log_Sensor_left;
+   char log_Dijkstra_maker;
+   char log_Error;
+   uint16_t log_D_row_count[16][15];
+   uint16_t log_D_column_count[16][15];
+
+  (void) nlhs; (void) nrhs;  /* unused parameters */
+
+   uint32_t* row = mxGetPr(prhs[0]);
+   uint32_t* column = mxGetPr(prhs[1]);
+   uint32_t* row_look = mxGetPr(prhs[2]);
+   uint32_t* column_look = mxGetPr(prhs[3]);
+   uint32_t* goal_x = mxGetPr(prhs[4]);
+   uint32_t* goal_y = mxGetPr(prhs[5]);
+   int* X = mxGetPr(prhs[6]);
+   int* Y = mxGetPr(prhs[7]);
+   int* Direction = mxGetPr(prhs[8]);
+   uint16_t* Sensor_front = mxGetPr(prhs[9]);
+   uint16_t* Sensor_right = mxGetPr(prhs[10]);
+   uint16_t* Sensor_left = mxGetPr(prhs[11]);
+   char* Dijkstra_maker = mxGetPr(prhs[12]);
+   char* Error = mxGetPr(prhs[13]);
+   uint16_t* D_row_count = mxGetPr(prhs[14]);
+   uint16_t* D_column_count = mxGetPr(prhs[15]);
+
+    for(int t=0;t<15;t++){
+        wall.row[t] = row[t];
+        wall.column[t] = column[t];
+        wall.row_look[t] = row_look[t];
+        wall.column_look[t] = column_look[t];
+        for(int t2=0;t2<16;t2++){
+            Dijkstra.row_count[t2][t]=D_row_count[15*t2 + t];
+            Dijkstra.column_count[t2][t]=D_column_count[15*t2 + t];
+        }
+    }
+    GOAL_X = *goal_x;
+    GOAL_Y = *goal_y;
+    x = *X;
+    y = *Y;
+    direction = *Direction;
+    g_sensor_front = *Sensor_front;
+    g_sensor_right = *Sensor_right;
+    g_sensor_left = *Sensor_left;
+    Dijkstra_maker_flag = *Dijkstra_maker;
+    error_mode = *Error;
+  /* call the computational subroutine */
+    AdatiWayReturn(300,400,2000,3000,speed300_exploration,1,1);
+    for(int t=0;t<15;t++){
+        log_row[t] = wall.row[t];
+        log_column[t] = wall.column[t];
+        log_row_look[t] = wall.row_look[t];
+        log_column_look[t] = wall.column_look[t];
+//         for(int t2=0;t2<16;t2++){
+//             D_row_count2[t2][t]=Dijkstra.row_count[t2][t];
+//             D_column_count2[t2][t]=Dijkstra.column_count[t2][t];
+//         }
+    }
+
+
+  /* create a 2-by-2 array of unsigned 16-bit integers */
+  plhs[0] = mxCreateNumericArray(2,dims0,mxUINT32_CLASS,mxREAL);
+  start_of_pr = (unsigned char *)mxGetData(plhs[0]);
+  bytes_to_copy = TOTAL_ELEMENTS0 * mxGetElementSize(plhs[0]);
+  memcpy(start_of_pr,wall.row,bytes_to_copy);
+
+      /* create a 2-by-2 array of unsigned 16-bit integers */
+  plhs[1] = mxCreateNumericArray(2,dims0,mxUINT32_CLASS,mxREAL);
+  start_of_pr = (unsigned char *)mxGetData(plhs[1]);
+  bytes_to_copy = TOTAL_ELEMENTS0 * mxGetElementSize(plhs[1]);
+  memcpy(start_of_pr,wall.column,bytes_to_copy);
+
+  /* create a 2-by-2 array of unsigned 16-bit integers */
+  plhs[2] = mxCreateNumericArray(2,dims0,mxUINT32_CLASS,mxREAL);
+  start_of_pr = (unsigned char *)mxGetData(plhs[2]);
+  bytes_to_copy = TOTAL_ELEMENTS0 * mxGetElementSize(plhs[2]);
+  memcpy(start_of_pr,wall.row_look,bytes_to_copy);
+
+  /* create a 2-by-2 array of unsigned 16-bit integers */
+  plhs[3] = mxCreateNumericArray(2,dims0,mxUINT32_CLASS,mxREAL);
+  start_of_pr = (unsigned char *)mxGetData(plhs[3]);
+  bytes_to_copy = TOTAL_ELEMENTS0 * mxGetElementSize(plhs[3]);
+  memcpy(start_of_pr,wall.column_look,bytes_to_copy);
+
+  /* create a 2-by-2 array of unsigned 16-bit integers */
+  plhs[4] = mxCreateNumericArray(2,dims1,mxUINT32_CLASS,mxREAL);
+  start_of_pr = (unsigned char *)mxGetData(plhs[4]);
+  bytes_to_copy = TOTAL_ELEMENTS1 * mxGetElementSize(plhs[4]);
+  coordinate[0]=x;
+  coordinate[1]=y;
+  coordinate[2]=direction;
+  memcpy(start_of_pr,coordinate,bytes_to_copy);
+
+   /* create a 2-by-2 array of unsigned 16-bit integers */
+  plhs[5] = mxCreateNumericArray(2,dims2,mxUINT32_CLASS,mxREAL);
+  start_of_pr = (unsigned char *)mxGetData(plhs[5]);
+  bytes_to_copy = TOTAL_ELEMENTS2 * mxGetElementSize(plhs[5]);
+  memcpy(start_of_pr,walk_count,bytes_to_copy);  
+
+   /* create a 2-by-2 array of unsigned 16-bit integers */
+  plhs[6] = mxCreateNumericArray(2,dims3,mxUINT16_CLASS,mxREAL);
+  start_of_pr = (unsigned char *)mxGetData(plhs[6]);
+  bytes_to_copy = TOTAL_ELEMENTS3 * mxGetElementSize(plhs[6]);
+  memcpy(start_of_pr,Dijkstra.row_count,bytes_to_copy);  
+
+   /* create a 2-by-2 array of unsigned 16-bit integers */
+  plhs[7] = mxCreateNumericArray(2,dims3,mxUINT16_CLASS,mxREAL);
+  start_of_pr = (unsigned char *)mxGetData(plhs[7]);
+  bytes_to_copy = TOTAL_ELEMENTS3 * mxGetElementSize(plhs[7]);
+  memcpy(start_of_pr,Dijkstra.column_count,bytes_to_copy);  
+
+//    /* create a 2-by-2 array of unsigned 16-bit integers */
+//   plhs[8] = mxCreateNumericArray(1,1,mxUINT8_CLASS,mxREAL);
+//   start_of_pr = (unsigned char *)mxGetData(plhs[8]);
+//   bytes_to_copy = TOTAL_ELEMENTS4 * mxGetElementSize(plhs[8]);
+//   memcpy(start_of_pr,Dijkstra_maker_flag,bytes_to_copy);  
+// 
+//        /* create a 2-by-2 array of unsigned 16-bit integers */
+//   plhs[9] = mxCreateNumericArray(1,1,mxUINT8_CLASS,mxREAL);
+//   start_of_pr = (unsigned char *)mxGetData(plhs[9]);
+//   bytes_to_copy = TOTAL_ELEMENTS4 * mxGetElementSize(plhs[9]);
+//   memcpy(start_of_pr,error_mode,bytes_to_copy);  
+    
+
+}
