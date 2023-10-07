@@ -484,15 +484,18 @@ void straight_table2(float input_displacement, float input_start_velocity,
 	pl_DriveMotor_start();
 
 	while (g_acc_flag!=4){
+        straight_velocity_log[log_num]=straight.velocity;
+        turning_velocity_log[log_num]=turning.velocity;
+        log_num++;
         straight.displacement += straight.velocity*INTERRUPT_TIME + straight.acceleration*INTERRUPT_TIME*INTERRUPT_TIME/2;
 		straight.velocity += straight.acceleration*INTERRUPT_TIME;
 		turning.displacement += turning.velocity*INTERRUPT_TIME + turning.acceleration*INTERRUPT_TIME*INTERRUPT_TIME/2;
 		turning.velocity += turning.acceleration*INTERRUPT_TIME;
 		cal_table(Trapezoid_straight,&straight);
-        straight_velocity_log[log_num]=straight.velocity;
-        turning_velocity_log[log_num]=turning.velocity;
-         log_num++;
+
 	}
+    log_num--;
+
 	if(input_end_velocity==0){//BREAK
 		wait_ms_NoReset(100);
 		modeacc = 0;
@@ -542,15 +545,16 @@ float turning_table2(float input_displacement, float input_start_velocity,
 
 	pl_DriveMotor_start();
 	while (g_acc_flag!=4){
+        straight_velocity_log[log_num]=straight.velocity;
+        turning_velocity_log[log_num]=turning.velocity;
+        log_num++;
 		straight.displacement += straight.velocity*INTERRUPT_TIME + straight.acceleration*INTERRUPT_TIME*INTERRUPT_TIME/2;
 		straight.velocity += straight.acceleration*INTERRUPT_TIME;
 		turning.displacement += turning.velocity*INTERRUPT_TIME + turning.acceleration*INTERRUPT_TIME*INTERRUPT_TIME/2;
 		turning.velocity += turning.acceleration*INTERRUPT_TIME;
 		cal_table(Trapezoid_turning,&turning);
-        straight_velocity_log[log_num]=straight.velocity;
-        turning_velocity_log[log_num]=turning.velocity;
-         log_num++;
 	}
+    log_num--;
 	if(input_end_velocity==0){//BREAK
 		wait_ms_NoReset(300);
 		modeacc = 0;
@@ -598,15 +602,16 @@ float slalom_table2(float input_center_velocity,float input_displacement, float 
 //	enc.sigma_error=0;
 	pl_DriveMotor_start();
 	while (g_acc_flag!=4){
+        straight_velocity_log[log_num]=straight.velocity;
+        turning_velocity_log[log_num]=turning.velocity;
+        log_num++;
 		straight.displacement += straight.velocity*INTERRUPT_TIME + straight.acceleration*INTERRUPT_TIME*INTERRUPT_TIME/2;
 		straight.velocity += straight.acceleration*INTERRUPT_TIME;
 		turning.displacement += turning.velocity*INTERRUPT_TIME + turning.acceleration*INTERRUPT_TIME*INTERRUPT_TIME/2;
 		turning.velocity += turning.acceleration*INTERRUPT_TIME;
 		cal_table(Trapezoid_turning,&turning);
-        straight_velocity_log[log_num]=straight.velocity;
-        turning_velocity_log[log_num]=turning.velocity;
-         log_num++;
 	}
+    log_num--;
 	pl_DriveMotor_stop();
 
 }
@@ -632,14 +637,15 @@ void mollifier_slalom_table(float input_center_velocity,float input_displacement
 
 	pl_DriveMotor_start();
 	while (g_acc_flag!=4){
+                straight_velocity_log[log_num]=straight.velocity;
+        turning_velocity_log[log_num]=turning.velocity;
+         log_num++;
 		straight.displacement += straight.velocity*INTERRUPT_TIME + straight.acceleration*INTERRUPT_TIME*INTERRUPT_TIME/2;
 		straight.velocity += straight.acceleration*INTERRUPT_TIME;
 		turning.displacement += turning.velocity*INTERRUPT_TIME;// + turning.acceleration*INTERRUPT_TIME*INTERRUPT_TIME/2;
 		cal_mollifier_table(Mollifier_turning,&turning);//角速度と角加速度はここで決定
-        straight_velocity_log[log_num]=straight.velocity;
-        turning_velocity_log[log_num]=turning.velocity;
-         log_num++;
 	}
+    log_num--;
 //	modeacc = 0;
 
 

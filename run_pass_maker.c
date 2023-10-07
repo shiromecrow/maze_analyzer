@@ -2301,6 +2301,11 @@ void mexFunction( int nlhs, mxArray *plhs[],
     Dijkstra_maker_flag = *Dijkstra_maker;
     error_mode = *Error;
   /* call the computational subroutine */
+    for(int i=0;i<501;i++){
+        pass[i]=0;
+        x_log[i]=0;
+        y_log[i]=0;
+    }
     run_shortest(3000,10000,0,1,1,1,speed300_exploration,0.99,1);
 
 

@@ -52,8 +52,13 @@ maze_goal = uint8(zeros(9,2));
 %2018全セミ 13 13 4
 %2017全日本 20 21 9
 %2020全日本学生 4 4 4
+%no_test1 7 7 4
+%no_test2 3 3 4
+%no_test3 10 9 4
+%no_test4 6 9 4
+%no_test5 7 7 4
 
-goal_x = 6;%610;%ゴール左下のx座標
+goal_x = 10;%610;%ゴール左下のx座標
 goal_y = 9;%911;%ゴール左下のy座標
 goal_size = uint8(4);%ゴールサイズを入力する
 
