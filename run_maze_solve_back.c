@@ -1868,7 +1868,7 @@ void create_DijkstraMap(void){
 			break;
 		}
 		if(Row_or_Column==ROW){
-			if(Ycoordinate <= 13){
+			if(Ycoordinate <= MAZE_SQUARE_NUM-3){
 				if(Direction==SLANT_NORTH){
 					dis_cost_in=dis_cost+DISCOUNTCOST_V;
 					if(dis_cost_in>=V_NUM_MAX){dis_cost_in=V_NUM_MAX-1;}
@@ -1957,7 +1957,7 @@ void create_DijkstraMap(void){
 
 		}
 		if(Row_or_Column==COLUMN){
-					if(Xcoordinate <= 13){
+					if(Xcoordinate <= MAZE_SQUARE_NUM-3){
 						if(Direction==SLANT_EAST){
 							dis_cost_in=dis_cost+DISCOUNTCOST_V;
 							if(dis_cost_in>=V_NUM_MAX){dis_cost_in=V_NUM_MAX-1;}

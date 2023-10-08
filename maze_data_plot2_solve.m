@@ -59,12 +59,12 @@ end
 
 %delete(fig_walkcount);
 
-% for i = 1:maze_row_size-1
-%     for j = 1:maze_col_size-1
-%         set(fig_walkcount(i,j),'String',num2str(g_walk_count(j,i)));
-%    %    fig_walkcount(i,j)=text(4.5+(i-1)*9,4.5+(j-1)*9,num2str(g_walk_count(j,i)),'VerticalAlignment','middle','HorizontalAlignment','center','FontSize',11,'EdgeColor','none');
-%     end
-% end
+for i = 1:maze_row_size-1
+    for j = 1:maze_col_size-1
+        set(fig_walkcount(i,j),'String',num2str(g_walk_count(j,i)));
+   %    fig_walkcount(i,j)=text(4.5+(i-1)*9,4.5+(j-1)*9,num2str(g_walk_count(j,i)),'VerticalAlignment','middle','HorizontalAlignment','center','FontSize',11,'EdgeColor','none');
+    end
+end
 
 delete(fig_mouse);
 fig_mouse=text(4.5+(x)*9,4.5+(y)*9,'M','VerticalAlignment','middle','HorizontalAlignment','center','FontSize',10,'EdgeColor','none');

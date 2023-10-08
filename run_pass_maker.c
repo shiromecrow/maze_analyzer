@@ -9,18 +9,17 @@
  */
 
 
+#define MAZE_SQUARE_NUM 32
+#define PASS_NUM 501
+
 #define NDIMS 2
 #define TOTAL_ELEMENTS0 501
-#define TOTAL_ELEMENTS1 3
-#define TOTAL_ELEMENTS2 256
-#define TOTAL_ELEMENTS3 240
-#define TOTAL_ELEMENTS4 2
 
 
-#define MAX_QUEUE_NUM 1000
+#define MAX_QUEUE_NUM 4000
 #define ROW 0
 #define COLUMN 1
-#define MAX_WALKCOUNT 255
+#define MAX_WALKCOUNT 65535
 #define MAX_WALKCOUNT_DIJKSTRA 65535
 #define ON 1
 #define OFF 0
@@ -67,16 +66,16 @@ typedef struct{
 } STACK_T;
 
 typedef struct{
-	uint32_t row[15];
-	uint32_t column[15];
-	uint32_t row_look[15];
-	uint32_t column_look[15];
+	uint32_t row[MAZE_SQUARE_NUM-1];
+	uint32_t column[MAZE_SQUARE_NUM-1];
+	uint32_t row_look[MAZE_SQUARE_NUM-1];
+	uint32_t column_look[MAZE_SQUARE_NUM-1];
 
 }WALL;
 
 typedef struct{
-	uint16_t row_count[16][15];
-	uint16_t column_count[16][15];
+	uint16_t row_count[MAZE_SQUARE_NUM][MAZE_SQUARE_NUM-1];
+	uint16_t column_count[MAZE_SQUARE_NUM][MAZE_SQUARE_NUM-1];
 }DIJKSTRA;
 
 typedef struct {
@@ -141,16 +140,16 @@ float g_V_battery_mean=4.1;
 STACK_T g_Goal_x;
 STACK_T g_Goal_y;
 char Dijkstra_maker_flag;
-uint32_t walk_count[16][16]; //歩数いれる箱
+uint32_t walk_count[MAZE_SQUARE_NUM][MAZE_SQUARE_NUM]; //歩数いれる箱
 char error_mode;
 DIJKSTRA Dijkstra;
 uint16_t g_sensor_front,g_sensor_right,g_sensor_left;
 int x,y,direction;
 
-int pass[500+1]; //1f 2r 3l
-int pass_log[500+1]; //1f 2r 3l
-int x_log[500+1]; //1f 2r 3l
-int y_log[500+1]; //1f 2r 3l
+int pass[PASS_NUM]; //1f 2r 3l
+int pass_log[PASS_NUM]; //1f 2r 3l
+int x_log[PASS_NUM]; //1f 2r 3l
+int y_log[PASS_NUM]; //1f 2r 3l
 
 void initStack_walk(STACK_T *stack){
 //	for(int i=0;i<=MAX_QUEUE_NUM-1;i++){
@@ -347,7 +346,7 @@ void update_wall(int x,int y,int direction,_Bool front_wall,_Bool right_wall,_Bo
 
 	switch (direction) {
 	case 1:
-		if (y <= 14) {
+		if (y <= MAZE_SQUARE_NUM-2) {
 			wall.row_look[y] = wall.row_look[y] | (1 << x);
 			if(front_wall){wall.row[y] = wall.row[y] | (1 << x);}
 		}
@@ -357,19 +356,19 @@ void update_wall(int x,int y,int direction,_Bool front_wall,_Bool right_wall,_Bo
 			if(left_wall){wall.column[x - 1] = wall.column[x - 1] | (1 << y);}
 		}
 
-		if (x <= 14) {
+		if (x <= MAZE_SQUARE_NUM-2) {
 			wall.column_look[x] = wall.column_look[x] | (1 << y);
 			if(right_wall){wall.column[x] = wall.column[x] | (1 << y);}
 		}
 
 		break;
 	case 2:
-		if (x <= 14) {
+		if (x <= MAZE_SQUARE_NUM-2) {
 			wall.column_look[x] = wall.column_look[x] | (1 << y);
 			if(front_wall){wall.column[x] = wall.column[x] | (1 << y);}
 		}
 
-		if (y <= 14) {
+		if (y <= MAZE_SQUARE_NUM-2) {
 			wall.row_look[y] = wall.row_look[y] | (1 << x);
 			if(left_wall){wall.row[y] = wall.row[y] | (1 << x);}
 		}
@@ -386,7 +385,7 @@ void update_wall(int x,int y,int direction,_Bool front_wall,_Bool right_wall,_Bo
 			if(front_wall){wall.row[y - 1] = wall.row[y - 1] | (1 << x);}
 		}
 
-		if (x <= 14) {
+		if (x <= MAZE_SQUARE_NUM-2) {
 			wall.column_look[x] = wall.column_look[x] | (1 << y);
 			if(left_wall){wall.column[x] = wall.column[x] | (1 << y);}
 		}
@@ -408,7 +407,7 @@ void update_wall(int x,int y,int direction,_Bool front_wall,_Bool right_wall,_Bo
 			if(left_wall){wall.row[y - 1] = wall.row[y - 1] | (1 << x);}
 		}
 
-		if (y <= 14) {
+		if (y <= MAZE_SQUARE_NUM-2) {
 			wall.row_look[y] = wall.row_look[y] | (1 << x);
 			if(right_wall){wall.row[y] = wall.row[y] | (1 << x);}
 		}
@@ -428,21 +427,21 @@ void get_wall(int x,int y,int direction,_Bool* front_wall,_Bool* right_wall,_Boo
 	*left_wall=1;
 	switch (direction) {
 	case 1:
-		if (y <= 14) {
+		if (y <= MAZE_SQUARE_NUM-2) {
 			*front_wall=((wall.row[y] & (1 << x)) == (1 << x));
 		}
 		if (x >= 1) {
 			*left_wall=((wall.column[x - 1] & (1 << y)) == (1 << y));
 		}
-		if (x <= 14) {
+		if (x <= MAZE_SQUARE_NUM-2) {
 			*right_wall=((wall.column[x] & (1 << y)) == (1 << y));
 		}
 		break;
 	case 2:
-		if (x <= 14) {
+		if (x <= MAZE_SQUARE_NUM-2) {
 			*front_wall=((wall.column[x] & (1 << y)) == (1 << y));
 		}
-		if (y <= 14) {
+		if (y <= MAZE_SQUARE_NUM-2) {
 			*left_wall=((wall.row[y] & (1 << x)) == (1 << x));
 		}
 		if (y >= 1) {
@@ -453,7 +452,7 @@ void get_wall(int x,int y,int direction,_Bool* front_wall,_Bool* right_wall,_Boo
 		if (y >= 1) {
 			*front_wall=((wall.row[y - 1] & (1 << x)) == (1 << x));
 		}
-		if (x <= 14) {
+		if (x <= MAZE_SQUARE_NUM-2) {
 			*left_wall=((wall.column[x] & (1 << y)) == (1 << y));
 		}
 		if (x >= 1) {
@@ -467,7 +466,7 @@ void get_wall(int x,int y,int direction,_Bool* front_wall,_Bool* right_wall,_Boo
 		if (y >= 1) {
 			*left_wall=((wall.row[y - 1] & (1 << x)) == (1 << x));
 		}
-		if (y <= 14) {
+		if (y <= MAZE_SQUARE_NUM-2) {
 			*right_wall=((wall.row[y] & (1 << x)) == (1 << x));
 		}
 		break;
@@ -482,21 +481,21 @@ void get_wall_look(int x,int y,int direction,_Bool* front_wall,_Bool* right_wall
 	*left_wall=1;
 	switch (direction) {
 	case 1:
-		if (y <= 14) {
+		if (y <= MAZE_SQUARE_NUM-2) {
 			*front_wall=((wall.row_look[y] & (1 << x)) == (1 << x));
 		}
 		if (x >= 1) {
 			*left_wall=((wall.column_look[x - 1] & (1 << y)) == (1 << y));
 		}
-		if (x <= 14) {
+		if (x <= MAZE_SQUARE_NUM-2) {
 			*right_wall=((wall.column_look[x] & (1 << y)) == (1 << y));
 		}
 		break;
 	case 2:
-		if (x <= 14) {
+		if (x <= MAZE_SQUARE_NUM-2) {
 			*front_wall=((wall.column_look[x] & (1 << y)) == (1 << y));
 		}
-		if (y <= 14) {
+		if (y <= MAZE_SQUARE_NUM-2) {
 			*left_wall=((wall.row_look[y] & (1 << x)) == (1 << x));
 		}
 		if (y >= 1) {
@@ -507,7 +506,7 @@ void get_wall_look(int x,int y,int direction,_Bool* front_wall,_Bool* right_wall
 		if (y >= 1) {
 			*front_wall=((wall.row_look[y - 1] & (1 << x)) == (1 << x));
 		}
-		if (x <= 14) {
+		if (x <= MAZE_SQUARE_NUM-2) {
 			*left_wall=((wall.column_look[x] & (1 << y)) == (1 << y));
 		}
 		if (x >= 1) {
@@ -521,7 +520,7 @@ void get_wall_look(int x,int y,int direction,_Bool* front_wall,_Bool* right_wall
 		if (y >= 1) {
 			*left_wall=((wall.row_look[y - 1] & (1 << x)) == (1 << x));
 		}
-		if (y <= 14) {
+		if (y <= MAZE_SQUARE_NUM-2) {
 			*right_wall=((wall.row_look[y] & (1 << x)) == (1 << x));
 		}
 		break;
@@ -541,10 +540,10 @@ void search_AroundWalkCount(unsigned short *front_count,unsigned short *right_co
 	unsigned short north_count,east_count,south_count,west_count;
 //	unsigned short front_count, right_count, back_count, left_count;
 
-	if (y >= 15) {north_count = MAX_WALKCOUNT;}
+	if (y >= MAZE_SQUARE_NUM-1) {north_count = MAX_WALKCOUNT;}
 	else {north_count = walk_count[x][y + 1];}
 
-	if (x >= 15) {east_count = MAX_WALKCOUNT;}
+	if (x >= MAZE_SQUARE_NUM-1) {east_count = MAX_WALKCOUNT;}
 	else {east_count = walk_count[x + 1][y];}
 
 	if (y <= 0) {south_count = MAX_WALKCOUNT;}
@@ -591,10 +590,10 @@ void search_AroundDijkstraCount(unsigned short *front_count,unsigned short *righ
 	unsigned short north_count,east_count,south_count,west_count;
 //	unsigned short front_count, right_count, back_count, left_count;
 
-	if (y >= 15) {north_count = MAX_WALKCOUNT_DIJKSTRA;}
+	if (y >= MAZE_SQUARE_NUM-1) {north_count = MAX_WALKCOUNT_DIJKSTRA;}
 	else {north_count = Dijkstra.row_count[x][y];}
 
-	if (x >= 15) {east_count = MAX_WALKCOUNT_DIJKSTRA;}
+	if (x >= MAZE_SQUARE_NUM-1) {east_count = MAX_WALKCOUNT_DIJKSTRA;}
 	else {east_count = Dijkstra.column_count[y][x];}
 
 	if (y <= 0) {south_count = MAX_WALKCOUNT_DIJKSTRA;}
@@ -678,8 +677,8 @@ void decision_kitiku(int x,int y,int direction,unsigned short front_count,unsign
 	//ここに壁条件がない
 	if (look_f && front_count <= right_count
 			&& front_count <= left_count && front_count <= back_count) {
-		if ((direction==1 && y>=14) ||
-			(direction==2 && x>=14) ||
+		if ((direction==1 && y>=MAZE_SQUARE_NUM-2) ||
+			(direction==2 && x>=MAZE_SQUARE_NUM-2) ||
 			(direction==3 && y<=1) ||
 			(direction==4 && x<=1) ){
 			kitikukan = 0;
@@ -737,8 +736,8 @@ void compress_kitiku(int *x,int *y,int *direction,int *kitiku_distance) {
 			//goal間近で停止
 			break;
 		}
-		if (direction_now==1 && y_now>=14) {break;}
-		if (direction_now==2 && x_now>=14) {break;}
+		if (direction_now==1 && y_now>=MAZE_SQUARE_NUM-2) {break;}
+		if (direction_now==2 && x_now>=MAZE_SQUARE_NUM-2) {break;}
 		if (direction_now==3 && y_now<=1) {break;}
 		if (direction_now==4 && x_now<=1) {break;}
 		if (front_count==MAX_WALKCOUNT && right_count==MAX_WALKCOUNT && left_count==MAX_WALKCOUNT && back_count==MAX_WALKCOUNT){
@@ -834,8 +833,8 @@ void create_StepCountMap_queue(void){
 	//ここから歩数マップを作る．*************************************
 	STACK_T stack_x;
 	STACK_T stack_y;
-	for(uint8_t xx = 0;xx <= 15;xx++){
-		for(uint8_t yy = 0;yy <= 15;yy++){
+	for(uint8_t xx = 0;xx <= MAZE_SQUARE_NUM-1;xx++){
+		for(uint8_t yy = 0;yy <= MAZE_SQUARE_NUM-1;yy++){
 			walk_count[xx][yy] = MAX_WALKCOUNT;
 		}
 	}
@@ -855,8 +854,8 @@ void create_StepCountMap_queue(void){
 	//printf("x head %d tail %d\n y head %d tail %d\n",stack_x.head,stack_x.tail,stack_y.head,stack_y.tail);
 	unsigned short count_number = 1;
 	unsigned short Xcoordinate,Ycoordinate;
-	unsigned short wall_north=1,wall_south=1,wall_east=1,wall_west=1;
-	while (count_number <= 254) {
+	uint32_t wall_north=1,wall_south=1,wall_east=1,wall_west=1;
+	while (count_number <= MAZE_SQUARE_NUM*MAZE_SQUARE_NUM-2) {
 
 		Xcoordinate = popStack_walk(&stack_x);
 		Ycoordinate = popStack_walk(&stack_y);
@@ -867,20 +866,20 @@ void create_StepCountMap_queue(void){
 			break;
 		}
 
-		if (Ycoordinate <= 14) {
+		if (Ycoordinate <= MAZE_SQUARE_NUM-2) {
 			wall_north = wall.row[Ycoordinate] & (1 << Xcoordinate);
 		}
 		if (Ycoordinate >= 1) {
 			wall_south = wall.row[Ycoordinate - 1] & (1 << Xcoordinate);
 		}
-		if (Xcoordinate <= 14) {
+		if (Xcoordinate <= MAZE_SQUARE_NUM-2) {
 			wall_east = wall.column[Xcoordinate] & (1 << Ycoordinate);
 		}
 		if (Xcoordinate >= 1) {
 			wall_west = wall.column[Xcoordinate - 1] & (1 << Ycoordinate);
 		}
 
-		if (walk_count[Xcoordinate][Ycoordinate + 1] == MAX_WALKCOUNT && Ycoordinate != 15 && wall_north == 0) {
+		if (walk_count[Xcoordinate][Ycoordinate + 1] == MAX_WALKCOUNT && Ycoordinate != MAZE_SQUARE_NUM-1 && wall_north == 0) {
 			walk_count[Xcoordinate][Ycoordinate + 1] = walk_count[Xcoordinate][Ycoordinate] + 1;
 			pushStack_walk(&stack_x,Xcoordinate);
 			pushStack_walk(&stack_y,Ycoordinate + 1);
@@ -890,7 +889,7 @@ void create_StepCountMap_queue(void){
 			pushStack_walk(&stack_x,Xcoordinate);
 			pushStack_walk(&stack_y,Ycoordinate - 1);
 		}
-		if (walk_count[Xcoordinate + 1][Ycoordinate] == MAX_WALKCOUNT && Xcoordinate != 15 && wall_east == 0) {
+		if (walk_count[Xcoordinate + 1][Ycoordinate] == MAX_WALKCOUNT && Xcoordinate != MAZE_SQUARE_NUM-1 && wall_east == 0) {
 			walk_count[Xcoordinate + 1][Ycoordinate] = walk_count[Xcoordinate][Ycoordinate] + 1;
 			pushStack_walk(&stack_x,Xcoordinate + 1);
 			pushStack_walk(&stack_y,Ycoordinate);
@@ -910,8 +909,8 @@ void create_StepCountMapBack_queue(void){
 	//ここから歩数マップを作る．*************************************
 	STACK_T stack_x;
 	STACK_T stack_y;
-	for(uint8_t xx = 0;xx <= 15;xx++){
-		for(uint8_t yy = 0;yy <= 15;yy++){
+	for(uint8_t xx = 0;xx <= MAZE_SQUARE_NUM-1;xx++){
+		for(uint8_t yy = 0;yy <= MAZE_SQUARE_NUM-1;yy++){
 			walk_count[xx][yy] = MAX_WALKCOUNT;
 		}
 	}
@@ -926,8 +925,8 @@ void create_StepCountMapBack_queue(void){
 	unsigned short coordinate;
 	unsigned short count_number = 1;
 	unsigned short Xcoordinate,Ycoordinate;
-	unsigned short wall_north=1,wall_south=1,wall_east=1,wall_west=1;
-	while (count_number <= 254) {
+	uint32_t wall_north=1,wall_south=1,wall_east=1,wall_west=1;
+	while (count_number <= MAZE_SQUARE_NUM*MAZE_SQUARE_NUM-2) {
 
 		Xcoordinate = popStack_walk(&stack_x);
 		Ycoordinate = popStack_walk(&stack_y);
@@ -938,21 +937,20 @@ void create_StepCountMapBack_queue(void){
 			break;
 		}
 
-		coordinate = (Xcoordinate * 16) + Ycoordinate;
-		if (Ycoordinate <= 14) {
+		if (Ycoordinate <= MAZE_SQUARE_NUM-2) {
 			wall_north = wall.row[Ycoordinate] & (1 << Xcoordinate);
 		}
 		if (Ycoordinate >= 1) {
 			wall_south = wall.row[Ycoordinate - 1] & (1 << Xcoordinate);
 		}
-		if (Xcoordinate <= 14) {
+		if (Xcoordinate <= MAZE_SQUARE_NUM-2) {
 			wall_east = wall.column[Xcoordinate] & (1 << Ycoordinate);
 		}
 		if (Xcoordinate >= 1) {
 			wall_west = wall.column[Xcoordinate - 1] & (1 << Ycoordinate);
 		}
 
-		if (walk_count[Xcoordinate][Ycoordinate + 1] == MAX_WALKCOUNT && Ycoordinate != 15 && wall_north == 0) {
+		if (walk_count[Xcoordinate][Ycoordinate + 1] == MAX_WALKCOUNT && Ycoordinate != MAZE_SQUARE_NUM-1 && wall_north == 0) {
 			walk_count[Xcoordinate][Ycoordinate + 1] = walk_count[Xcoordinate][Ycoordinate] + 1;
 			pushStack_walk(&stack_x,Xcoordinate);
 			pushStack_walk(&stack_y,Ycoordinate + 1);
@@ -962,7 +960,7 @@ void create_StepCountMapBack_queue(void){
 			pushStack_walk(&stack_x,Xcoordinate);
 			pushStack_walk(&stack_y,Ycoordinate - 1);
 		}
-		if (walk_count[Xcoordinate + 1][Ycoordinate] == MAX_WALKCOUNT && Xcoordinate != 15 && wall_east == 0) {
+		if (walk_count[Xcoordinate + 1][Ycoordinate] == MAX_WALKCOUNT && Xcoordinate != MAZE_SQUARE_NUM-1 && wall_east == 0) {
 			walk_count[Xcoordinate + 1][Ycoordinate] = walk_count[Xcoordinate][Ycoordinate] + 1;
 			pushStack_walk(&stack_x,Xcoordinate + 1);
 			pushStack_walk(&stack_y,Ycoordinate);
@@ -985,8 +983,8 @@ void create_StepCountMap_unknown(void){
 	STACK_T stack_x;
 	STACK_T stack_y;
 	unsigned short goalX,goalY;
-	for(uint8_t xx = 0;xx <= 15;xx++){
-		for(uint8_t yy = 0;yy <= 15;yy++){
+	for(uint8_t xx = 0;xx <= MAZE_SQUARE_NUM-1;xx++){
+		for(uint8_t yy = 0;yy <= MAZE_SQUARE_NUM-1;yy++){
 			walk_count[xx][yy] = MAX_WALKCOUNT;
 		}
 	}
@@ -1022,8 +1020,8 @@ void create_StepCountMap_unknown(void){
 	//printf("x head %d tail %d\n y head %d tail %d\n",stack_x.head,stack_x.tail,stack_y.head,stack_y.tail);
 	unsigned short count_number = 1;
 	unsigned short Xcoordinate,Ycoordinate;
-	unsigned short wall_north=1,wall_south=1,wall_east=1,wall_west=1;
-	while (count_number <= 254) {
+	uint32_t wall_north=1,wall_south=1,wall_east=1,wall_west=1;
+	while (count_number <= MAZE_SQUARE_NUM*MAZE_SQUARE_NUM-2) {
 
 		Xcoordinate = popStack_walk(&stack_x);
 		Ycoordinate = popStack_walk(&stack_y);
@@ -1034,20 +1032,20 @@ void create_StepCountMap_unknown(void){
 			break;
 		}
 
-		if (Ycoordinate <= 14) {
+		if (Ycoordinate <= MAZE_SQUARE_NUM-2) {
 			wall_north = wall.row[Ycoordinate] & (1 << Xcoordinate);
 		}
 		if (Ycoordinate >= 1) {
 			wall_south = wall.row[Ycoordinate - 1] & (1 << Xcoordinate);
 		}
-		if (Xcoordinate <= 14) {
+		if (Xcoordinate <= MAZE_SQUARE_NUM-2) {
 			wall_east = wall.column[Xcoordinate] & (1 << Ycoordinate);
 		}
 		if (Xcoordinate >= 1) {
 			wall_west = wall.column[Xcoordinate - 1] & (1 << Ycoordinate);
 		}
 
-		if (walk_count[Xcoordinate][Ycoordinate + 1] == MAX_WALKCOUNT && Ycoordinate != 15 && wall_north == 0) {
+		if (walk_count[Xcoordinate][Ycoordinate + 1] == MAX_WALKCOUNT && Ycoordinate != MAZE_SQUARE_NUM-1 && wall_north == 0) {
 			walk_count[Xcoordinate][Ycoordinate + 1] = walk_count[Xcoordinate][Ycoordinate] + 1;
 			pushStack_walk(&stack_x,Xcoordinate);
 			pushStack_walk(&stack_y,Ycoordinate + 1);
@@ -1057,7 +1055,7 @@ void create_StepCountMap_unknown(void){
 			pushStack_walk(&stack_x,Xcoordinate);
 			pushStack_walk(&stack_y,Ycoordinate - 1);
 		}
-		if (walk_count[Xcoordinate + 1][Ycoordinate] == MAX_WALKCOUNT && Xcoordinate != 15 && wall_east == 0) {
+		if (walk_count[Xcoordinate + 1][Ycoordinate] == MAX_WALKCOUNT && Xcoordinate != MAZE_SQUARE_NUM-1 && wall_east == 0) {
 			walk_count[Xcoordinate + 1][Ycoordinate] = walk_count[Xcoordinate][Ycoordinate] + 1;
 			pushStack_walk(&stack_x,Xcoordinate + 1);
 			pushStack_walk(&stack_y,Ycoordinate);
@@ -1272,8 +1270,8 @@ void create_DijkstraMap(void){
 	initStack_walk(&stack_matrix);
 	initStack_walk(&stack_direction);
 	initStack_walk(&stack_cost);
-	for(int i=0;i<=15;i++){
-		for(int j=0;j<=14;j++){
+	for(int i=0;i<=MAZE_SQUARE_NUM-1;i++){
+		for(int j=0;j<=MAZE_SQUARE_NUM-2;j++){
 			Dijkstra.column_count[i][j]=MAX_WALKCOUNT_DIJKSTRA;
 			Dijkstra.row_count[i][j]=MAX_WALKCOUNT_DIJKSTRA;
 		}
@@ -1310,7 +1308,7 @@ void create_DijkstraMap(void){
 			break;
 		}
 		if(Row_or_Column==ROW){
-			if(Ycoordinate <= 13){
+			if(Ycoordinate <= MAZE_SQUARE_NUM-3){
 				if(Direction==SLANT_NORTH){
 					dis_cost_in=dis_cost+DISCOUNTCOST_V;
 					if(dis_cost_in>=V_NUM_MAX){dis_cost_in=V_NUM_MAX-1;}
@@ -1340,7 +1338,7 @@ void create_DijkstraMap(void){
 					pushStack_walk(&stack_cost,dis_cost_in);
 				}
 			}
-			if (Xcoordinate <= 14) {
+			if (Xcoordinate <= MAZE_SQUARE_NUM-2) {
 				if(Direction==SLANT_SOUTH_EAST){
 					dis_cost_in=dis_cost+DISCOUNTCOST_D;
 					if(dis_cost_in>=D_NUM_MAX){dis_cost_in=D_NUM_MAX-1;}
@@ -1399,7 +1397,7 @@ void create_DijkstraMap(void){
 
 		}
 		if(Row_or_Column==COLUMN){
-					if(Xcoordinate <= 13){
+					if(Xcoordinate <= MAZE_SQUARE_NUM-3){
 						if(Direction==SLANT_EAST){
 							dis_cost_in=dis_cost+DISCOUNTCOST_V;
 							if(dis_cost_in>=V_NUM_MAX){dis_cost_in=V_NUM_MAX-1;}
@@ -1429,7 +1427,7 @@ void create_DijkstraMap(void){
 							pushStack_walk(&stack_cost,dis_cost_in);
 						}
 					}
-					if (Ycoordinate <= 14) {
+					if (Ycoordinate <= MAZE_SQUARE_NUM-2) {
 						if(Direction==SLANT_NORTH_WEST){
 							dis_cost_in=dis_cost+DISCOUNTCOST_D;
 							if(dis_cost_in>=D_NUM_MAX){dis_cost_in=D_NUM_MAX-1;}
@@ -1598,7 +1596,7 @@ void run_movement_suspension(int *direction, unsigned short front_count,
 			pl_DriveMotor_standby(OFF);
 			//break;
 		}
-		if (x < 0 || y < 0 || x > 15 || y > 15) {
+		if (x < 0 || y < 0 || x > MAZE_SQUARE_NUM-1 || y > MAZE_SQUARE_NUM-1) {
 			// 迷路破損のため停止(一時停止後に周辺の地図情報を初期化して再探索に変更予定)
 			error_mode = 1;
 			g_WallControl_mode = 0;
@@ -1657,7 +1655,7 @@ if(error_mode==0){
 
 void pass_maker_Dijkstra(void){
 
-	unsigned short front_count, right_count, back_count, left_count;
+	uint16_t front_count, right_count, back_count, left_count;
 
 	_Bool front_wall;
 	_Bool right_wall;
@@ -1782,8 +1780,8 @@ void run_shortest(float inspeed, float inacc, int stmass, char pass_mode, char f
 	mode.calMazeMode=0;
 
 	//highspeed_mode = 1;
-	for(int i = 0; i <= 254; i++){pass[i] = 0;}
-	for(int i = 0; i <= 14; i++){
+	for(int i = 0; i < PASS_NUM; i++){pass[i] = 0;}
+	for(int i = 0; i <= MAZE_SQUARE_NUM-2; i++){
 		record.row[i] = wall.row[i];
 		record.column[i] = wall.column[i];
 		record.row_look[i] = wall.row_look[i];
@@ -2086,7 +2084,7 @@ if(pass_mode==1){
 	straight_table2(BACK_TO_CENTER_FRONT,0,end_velocity,end_velocity,end_velocity*end_velocity/ BACK_TO_CENTER_FRONT/2, mode);
 
 
-	while (pass_count <= 500) {
+	while (pass_count < PASS_NUM) {
 		pass_count2=pass_count+1;
 		while(pass[pass_count2] == -1){
 			pass_count2++;
@@ -2213,13 +2211,13 @@ if(pass_mode==1){
 	pl_DriveMotor_standby(OFF);
 	int t = 0;
 
-	while (t <= 14) {
+	while (t <= MAZE_SQUARE_NUM-2) {
 		wall.row[t] = record.row[t];
 		wall.column[t] = record.column[t];
 		t++;
 	}
 	t = 0;
-	while (t <= 14) {
+	while (t <= MAZE_SQUARE_NUM-2) {
 		wall.row_look[t] = ~wall.row_look[t];
 		wall.column_look[t] = ~wall.column_look[t];
 		t++;
@@ -2236,7 +2234,7 @@ if(pass_mode==1){
 void mexFunction( int nlhs, mxArray *plhs[],
                   int nrhs, const mxArray *prhs[] )
 {
-  const mwSize dims0[]={501,1};
+  const mwSize dims0[]={PASS_NUM,1};
   unsigned char *start_of_pr;
   unsigned short data[]={1,2,3,4};
   int coordinate[3];
@@ -2244,10 +2242,10 @@ void mexFunction( int nlhs, mxArray *plhs[],
   size_t bytes_to_copy;
 
 
-   uint32_t log_row[15];
-   uint32_t log_column[15];
-   uint32_t log_row_look[15];
-   uint32_t log_column_look[15];
+   uint32_t log_row[MAZE_SQUARE_NUM-1];
+   uint32_t log_column[MAZE_SQUARE_NUM-1];
+   uint32_t log_row_look[MAZE_SQUARE_NUM-1];
+   uint32_t log_column_look[MAZE_SQUARE_NUM-1];
    uint32_t log_goal_x;
    uint32_t log_goal_y;
    int log_X;
@@ -2258,8 +2256,8 @@ void mexFunction( int nlhs, mxArray *plhs[],
    uint16_t log_Sensor_left;
    char log_Dijkstra_maker;
    char log_Error;
-   uint16_t log_D_row_count[16][15];
-   uint16_t log_D_column_count[16][15];
+   uint16_t log_D_row_count[MAZE_SQUARE_NUM][MAZE_SQUARE_NUM-1];
+   uint16_t log_D_column_count[MAZE_SQUARE_NUM][MAZE_SQUARE_NUM-1];
 
   (void) nlhs; (void) nrhs;  /* unused parameters */
 
@@ -2280,14 +2278,14 @@ void mexFunction( int nlhs, mxArray *plhs[],
    uint16_t* D_row_count = mxGetPr(prhs[14]);
    uint16_t* D_column_count = mxGetPr(prhs[15]);
 
-    for(int t=0;t<15;t++){
+    for(int t=0;t<MAZE_SQUARE_NUM-1;t++){
         wall.row[t] = row[t];
         wall.column[t] = column[t];
         wall.row_look[t] = row_look[t];
         wall.column_look[t] = column_look[t];
-        for(int t2=0;t2<16;t2++){
-            Dijkstra.row_count[t2][t]=D_row_count[16*t + t2];
-            Dijkstra.column_count[t2][t]=D_column_count[16*t + t2];
+        for(int t2=0;t2<MAZE_SQUARE_NUM;t2++){
+            Dijkstra.row_count[t2][t]=D_row_count[MAZE_SQUARE_NUM*t + t2];
+            Dijkstra.column_count[t2][t]=D_column_count[MAZE_SQUARE_NUM*t + t2];
         }
     }
     GOAL_X = *goal_x;
@@ -2301,7 +2299,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
     Dijkstra_maker_flag = *Dijkstra_maker;
     error_mode = *Error;
   /* call the computational subroutine */
-    for(int i=0;i<501;i++){
+    for(int i=0;i<PASS_NUM;i++){
         pass[i]=0;
         x_log[i]=0;
         y_log[i]=0;
@@ -2312,19 +2310,19 @@ void mexFunction( int nlhs, mxArray *plhs[],
   /* create a 2-by-2 array of unsigned 16-bit integers */
   plhs[0] = mxCreateNumericArray(2,dims0,mxINT32_CLASS,mxREAL);
   start_of_pr = (unsigned char *)mxGetData(plhs[0]);
-  bytes_to_copy = TOTAL_ELEMENTS0 * mxGetElementSize(plhs[0]);
+  bytes_to_copy = PASS_NUM * mxGetElementSize(plhs[0]);
   memcpy(start_of_pr,pass,bytes_to_copy);
 
   /* create a 2-by-2 array of unsigned 16-bit integers */
   plhs[1] = mxCreateNumericArray(2,dims0,mxINT32_CLASS,mxREAL);
   start_of_pr = (unsigned char *)mxGetData(plhs[1]);
-  bytes_to_copy = TOTAL_ELEMENTS0 * mxGetElementSize(plhs[1]);
+  bytes_to_copy = PASS_NUM * mxGetElementSize(plhs[1]);
   memcpy(start_of_pr,x_log,bytes_to_copy);
 
       /* create a 2-by-2 array of unsigned 16-bit integers */
   plhs[2] = mxCreateNumericArray(2,dims0,mxINT32_CLASS,mxREAL);
   start_of_pr = (unsigned char *)mxGetData(plhs[2]);
-  bytes_to_copy = TOTAL_ELEMENTS0 * mxGetElementSize(plhs[2]);
+  bytes_to_copy = PASS_NUM * mxGetElementSize(plhs[2]);
   memcpy(start_of_pr,y_log,bytes_to_copy);
 
 
