@@ -15,6 +15,8 @@ global vidObj; %動画作成用のビデオオブジェクト
 video_flg = 0;
 %画像なら0,数字直打ち1
 get_maze_mode=0;
+global WalkCount_display_flg;
+WalkCount_display_flg=0;
 %% ビデオ記録用変数の宣言
 if video_flg
     vidObj = VideoWriter('result.mp4','MPEG-4');
@@ -57,6 +59,8 @@ run_mode2_flg = run_mode2.adachi;
 %no_test3 10 9 4
 %no_test4 6 9 4
 %no_test5 7 7 4
+%2019全日本　17 13 9
+%2022全日本　14 14 9
 
 goal_x = 17;%610;%ゴール左下のx座標
 goal_y = 13;%911;%ゴール左下のy座標
@@ -64,6 +68,7 @@ goal_size = uint8(4);%ゴールサイズを入力する
 
 goal_size_d = double(goal_size);
 
+tic
 
 %% 迷路データ取得
 global  maze_serial;
@@ -93,14 +98,15 @@ global maze_fig_ax;
 maze_fig_ax = gca;
 set(maze_fig_ax,'color','none','NextPlot','add')
 maze_fig = gcf;
+set(gcf,'doublebuffer','off');
 
 %figureの出力位置
 maze_fig.Position = [2,42,958,954];
 
 %%
-maze_data_plot2(maze_row_size,maze_col_size);
+%maze_data_plot2(maze_row_size,maze_col_size);
 %maze_data_plot(maze_row_size,maze_col_size,maze_row_data,maze_col_data);
-
+figure(maze_fig);
 
 wall_row = uint32(zeros(maze_col_size-2,1));
 wall_column = uint32(zeros(maze_row_size-2,1));
@@ -149,6 +155,7 @@ maze_data_plot2_solve(del_wall_row,maze_row_size,del_wall_column,maze_col_size,c
 if (coordinate(1)==goal_x || coordinate(1)==goal_x+1) && (coordinate(2)==goal_y || coordinate(2)==goal_y+1)
 break
 end
+
 end
 
 T_all
@@ -193,4 +200,4 @@ if video_flg
     close(vidObj);
 end
 
-
+toc

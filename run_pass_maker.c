@@ -15,6 +15,8 @@
 #define NDIMS 2
 #define TOTAL_ELEMENTS0 501
 
+#define SLANT_PASS_COUNT 500
+
 
 #define MAX_QUEUE_NUM 4000
 #define ROW 0
@@ -1960,7 +1962,7 @@ if(pass_mode==1){
 				}
 				if (pass[pass_count] >= -3) {
 					slant_count = pass_count;
-					pass[slant_count] = 51;
+					pass[slant_count] = SLANT_PASS_COUNT+1;
 					pass_count++;
 				}
 
@@ -1985,11 +1987,11 @@ if(pass_mode==1){
 						}
 
 					} else {
-						if (pass[slant_count] >= 50) {
+						if (pass[slant_count] >= SLANT_PASS_COUNT) {
 							pass[pass_count] = -1;
 						} else {
 							slant_count = pass_count;
-							pass[slant_count] = 50;
+							pass[slant_count] = SLANT_PASS_COUNT;
 						}
 						pass[slant_count] = pass[slant_count] + 1;
 						if (slant_direction == -2) {
@@ -2013,7 +2015,7 @@ if(pass_mode==1){
 		pass_count=0;
 		while (1) {		//パス圧縮
 
-			if (pass[pass_count] == 50) {
+			if (pass[pass_count] == SLANT_PASS_COUNT) {
 				pass[pass_count] =-1;
 
 			}
@@ -2174,10 +2176,10 @@ if(pass_mode==1){
 			if (pass[pass_count + 1] == -2 || pass[pass_count + 1] == -3) {
 				last_v = howspeed.SlalomCentervelocity;
 			}
-			if (pass[pass_count] >= 50) {
+			if (pass[pass_count] >= SLANT_PASS_COUNT) {
 				mode.WallControlMode=3;
 				mode.WallControlStatus=0;
-				straight_table2((45 * sqrt(2) * (pass[pass_count] - 50)),first_v, end_velocity,inspeed, inacc, mode);
+				straight_table2((45 * sqrt(2) * (pass[pass_count] - SLANT_PASS_COUNT)),first_v, end_velocity,inspeed, inacc, mode);
 			} else {
 				mode.WallControlMode=1;
 				mode.WallControlStatus=0;

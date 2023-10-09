@@ -13,18 +13,18 @@ maze_step =  9;% [mm]
 maze_row_size = double(maze_row_size);
 maze_col_size = double(maze_col_size);
 
-[poleX,poleY] = meshgrid(0:maze_step:(maze_col_size-1)*maze_step,0:maze_step:(maze_row_size-1)*maze_step);
-plot(poleX,poleY,'s','MarkerSize',5,...
-    'MarkerEdgeColor',[0 0 0],...
-    'MarkerFaceColor',[0.4 0 0]);
-xlim([0 (maze_col_size-1)*maze_step])
-ylim([0 (maze_row_size-1)*maze_step])
-xticks(0:maze_step:(maze_col_size-1)*maze_step)
-yticks(0:maze_step:(maze_row_size-1)*maze_step)
-xticklabels({})
-yticklabels({})
-pbaspect([1 1 1])
-grid on
+% [poleX,poleY] = meshgrid(0:maze_step:(maze_col_size-1)*maze_step,0:maze_step:(maze_row_size-1)*maze_step);
+% plot(poleX,poleY,'s','MarkerSize',5,...
+%     'MarkerEdgeColor',[0 0 0],...
+%     'MarkerFaceColor',[0.4 0 0]);
+% xlim([0 (maze_col_size-1)*maze_step])
+% ylim([0 (maze_row_size-1)*maze_step])
+% xticks(0:maze_step:(maze_col_size-1)*maze_step)
+% yticks(0:maze_step:(maze_row_size-1)*maze_step)
+% xticklabels({})
+% yticklabels({})
+% pbaspect([1 1 1])
+% grid on
 
 %  ax = gca;
 %  ax.TickLength = [0.0 0.0];
