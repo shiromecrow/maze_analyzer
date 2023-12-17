@@ -9,7 +9,7 @@
  */
 
 
-#define MAZE_SQUARE_NUM 32
+#define MAZE_SQUARE_NUM 16
 
 #define NDIMS 2
 #define TOTAL_ELEMENTS0 (MAZE_SQUARE_NUM-1)
@@ -23,7 +23,7 @@
 #define MOTOR_FRONT 1
 #define MOTOR_BACK 2
 #define MOTOR_BREAK 3
-#define MAX_QUEUE_NUM 4000
+#define MAX_QUEUE_NUM 1500
 #define ROW 0
 #define COLUMN 1
 #define MAX_WALKCOUNT 65535
@@ -47,8 +47,8 @@
 #define MIN_DIAGONALCOST 10
 #define DISCOUNTCOST_V 1//絶対1
 #define DISCOUNTCOST_D 1//絶対1
-#define V_NUM_MAX 5
-#define D_NUM_MAX 6
+#define V_NUM_MAX 10
+#define D_NUM_MAX 14
 
 #define SLANT_NORTH 0
 #define SLANT_NORTH_EAST 1
@@ -1820,8 +1820,8 @@ void create_DijkstraMap(void){
 	STACK_T stack_cost;//引かれるコスト
 	int16_t VerticalCost=VERTICALCOST;
 	int16_t DiagonalCost=DIAGONALCOST;
-	int16_t discount_v[V_NUM_MAX]={180,118,100,91,90};
-	int16_t discount_d[D_NUM_MAX]={127,91,79,71,65,64};
+	int16_t discount_v[V_NUM_MAX]={180,118,100,88,80,60,60,60,60,60};
+	int16_t discount_d[D_NUM_MAX]={127,91,79,70,64,42,42,42,42,42,42,42,42,42};
 	int16_t dis_cost_in;
 	//printf("%d,%d,%d,%d,%d\n",discount_v[0],discount_v[1],discount_v[2],discount_v[3],discount_v[4]);
 	//printf("%d,%d,%d,%d,%d,%d\n",discount_d[0],discount_d[1],discount_d[2],discount_d[3],discount_d[4],discount_d[5]);

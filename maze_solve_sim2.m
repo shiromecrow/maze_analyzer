@@ -1,10 +1,15 @@
+%mex run_maze_solve_front.c
+mex run_maze_solve_back.c
+mex run_pass_maker.c
+mex run_pass_maker2.c
+
 clearvars
 clearvars -global
 close all
 clc
 %% パス定義
 currentdir = cd;
-addpath(strcat(currentdir,'/src'),'-end')
+%addpath(strcat(currentdir,'/src'),'-end')
 
 %% デバッグモード定義
 global maze_data_get_debug;
@@ -14,9 +19,9 @@ global vidObj; %動画作成用のビデオオブジェクト
 %ビデオフラグ
 video_flg = 0;
 %画像なら0,数字直打ち1
-get_maze_mode=0;
+get_maze_mode=1;
 global WalkCount_display_flg;
-WalkCount_display_flg=0;
+WalkCount_display_flg=1;
 %% ビデオ記録用変数の宣言
 if video_flg
     vidObj = VideoWriter('result.mp4','MPEG-4');
@@ -62,8 +67,8 @@ run_mode2_flg = run_mode2.adachi;
 %2019全日本　17 13 9
 %2022全日本　14 14 9
 
-goal_x = 17;%610;%ゴール左下のx座標
-goal_y = 13;%911;%ゴール左下のy座標
+goal_x = 6;%610;%ゴール左下のx座標
+goal_y = 9;%911;%ゴール左下のy座標
 goal_size = uint8(4);%ゴールサイズを入力する
 
 goal_size_d = double(goal_size);
@@ -123,8 +128,9 @@ Sensor_left = uint16(1);
 Dijkstra_maker = uint8(0);
 Error = uint8(0);
 all_mode=[Dijkstra_maker;Error];
-D_row_map=uint16(zeros(16,15));
-D_column_map=uint16(zeros(16,15));
+D_row_map=uint16(zeros((maze_row_size-1),(maze_row_size-2)));
+D_column_map=uint16(zeros((maze_row_size-1),(maze_row_size-2)));
+D_Network=uint16(zeros(2*uint16(maze_row_size-1)*uint16(maze_row_size-2),2*uint16(maze_row_size-1)*uint16(maze_row_size-2)));
 maze_data_plot2_solve_0(wall_row,maze_row_size,wall_column,maze_col_size,coordinate(1),coordinate(2),coordinate(3));
 
 Straight_all=[];
@@ -185,12 +191,21 @@ break
 end
 end
 T_all
-maze_data_plot2_Dresult(wall_row,maze_row_size,wall_column,maze_col_size,D_row_map,D_column_map);
 
-[Pass,Xp,Yp]=run_pass_maker( ...
+
+% [Pass,Xp,Yp,D_row_map,D_column_map]=run_pass_maker( ...
+%     wall_row,wall_column,wall_row_look,wall_column_look, ...
+%     uint32(goal_x),uint32(goal_y),coordinate(1),coordinate(2),coordinate(3),Sensor_front,Sensor_right,Sensor_left, ...
+%     all_mode(1),all_mode(2),D_row_map,D_column_map);
+
+[Pass,Xp,Yp,D_row_map,D_column_map,D_Network]=run_pass_maker2( ...
     wall_row,wall_column,wall_row_look,wall_column_look, ...
     uint32(goal_x),uint32(goal_y),coordinate(1),coordinate(2),coordinate(3),Sensor_front,Sensor_right,Sensor_left, ...
     all_mode(1),all_mode(2),D_row_map,D_column_map);
+
+D_row_map=D_row_map';
+D_column_map=D_column_map';
+maze_data_plot2_Dresult(wall_row,maze_row_size,wall_column,maze_col_size,D_row_map,D_column_map);
 
 route_plot(Xp,Yp);
 %route_maker(Pass);

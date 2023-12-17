@@ -40,7 +40,7 @@ for i = 2:maze_row_size-1
     for j = 1:1:(maze_col_size-1)
        if (bitand(wall_row(i-1),bitshift(1,j-1)) ~= bitshift(1,j-1))
            %plot([j-1,j].*maze_step,[i-1,i-1].*maze_step,'Color',[0 0 0.9],'LineWidth',1.5)
-           fig_walkcount_D_row(j,i-1)=text((j-0.5)*9,(i-1)*9,num2str(D_row_map(j,i-1)),'VerticalAlignment','middle','HorizontalAlignment','center','FontSize',11/2,'EdgeColor','none');
+           fig_walkcount_D_row(j,i-1)=text((j-0.5)*9,(i-1)*9,num2str(D_row_map(j,i-1)),'VerticalAlignment','middle','HorizontalAlignment','center','FontSize',11,'EdgeColor','none');
        end
     end
 end
@@ -51,7 +51,7 @@ for i = 1:maze_row_size-1
     for j = 2:maze_col_size-1
        if (bitand(wall_column(j-1),bitshift(1,i-1)) ~= bitshift(1,i-1))
            %plot([j-1,j-1].*maze_step,[i-1,i].*maze_step,'Color',[0 0 0.9],'LineWidth',1.5)
-           fig_walkcount_D_column(j-1,i)=text((j-1)*9,(i-0.5)*9,num2str(D_column_map(i,j-1)),'VerticalAlignment','middle','HorizontalAlignment','center','FontSize',11/2,'EdgeColor','none');
+           fig_walkcount_D_column(j-1,i)=text((j-1)*9,(i-0.5)*9,num2str(D_column_map(i,j-1)),'VerticalAlignment','middle','HorizontalAlignment','center','FontSize',11,'EdgeColor','none');
        end
     end
 end
