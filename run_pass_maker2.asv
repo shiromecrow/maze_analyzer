@@ -80,6 +80,9 @@ typedef struct{
 typedef struct{
 	uint16_t row_count[MAZE_SQUARE_NUM][MAZE_SQUARE_NUM-1];
 	uint16_t column_count[MAZE_SQUARE_NUM][MAZE_SQUARE_NUM-1];
+    uint16_t row_route[MAZE_SQUARE_NUM][MAZE_SQUARE_NUM-1];
+    uint16_t column_route[MAZE_SQUARE_NUM][MAZE_SQUARE_NUM-1];
+
 }DIJKSTRA;
 
 typedef struct {
@@ -145,7 +148,9 @@ STACK_T g_Goal_x;
 STACK_T g_Goal_y;
 char Dijkstra_maker_flag;
 uint32_t walk_count[MAZE_SQUARE_NUM][MAZE_SQUARE_NUM]; //歩数いれる箱
-uint16_t Network[2*MAZE_SQUARE_NUM*(MAZE_SQUARE_NUM-1)][2*MAZE_SQUARE_NUM*(MAZE_SQUARE_NUM-1)]; //歩数いれる箱
+uint16_t Network[2*MAZE_SQUARE_NUM*(MAZE_SQUARE_NUM-1)][2*MAZE_SQUARE_NUM*(MAZE_SQUARE_NUM-1)]; //ネットワーク
+uint8_t Network_dis[2*MAZE_SQUARE_NUM*(MAZE_SQUARE_NUM-1)][2*MAZE_SQUARE_NUM*(MAZE_SQUARE_NUM-1)]; //距離の保存
+uint8_t Network_dir[2*MAZE_SQUARE_NUM*(MAZE_SQUARE_NUM-1)][2*MAZE_SQUARE_NUM*(MAZE_SQUARE_NUM-1)]; //方向の保存
 char error_mode;
 DIJKSTRA Dijkstra;
 uint16_t g_sensor_front,g_sensor_right,g_sensor_left;
@@ -155,6 +160,10 @@ int pass[PASS_NUM]; //1f 2r 3l
 int pass_log[PASS_NUM]; //1f 2r 3l
 int x_log[PASS_NUM]; //1f 2r 3l
 int y_log[PASS_NUM]; //1f 2r 3l
+int x_log_net[PASS_NUM]; //1f 2r 3l
+int y_log_net[PASS_NUM]; //1f 2r 3l
+int rc_log_net[PASS_NUM]; //1f 2r 3l
+int dis_log_net[PASS_NUM]; //1f 2r 3l
 
 void initStack_walk(STACK_T *stack){
 //	for(int i=0;i<=MAX_QUEUE_NUM-1;i++){
@@ -287,11 +296,20 @@ void V90L(parameter turnpara,  char test_mode,char mollifier_mode,float end_velo
 
 
 
-uint16_t trans_WalltoNetwork(uint16_t Row_or_Column, int16_t index1,int16_t index2){
+uint16_t trans_WalltoNetwork(uint16_t Row_or_Column, int16_t index_X,int16_t index_Y){
     // スライス化関数
     uint16_t RC_num=2;
     uint16_t in1_num=MAZE_SQUARE_NUM;
     uint16_t in2_num=MAZE_SQUARE_NUM-1;
+    uint16_t index1;
+    uint16_t index2;
+    if (Row_or_Column==0){
+    index1=index_X;
+    index2=index_Y;
+    }else{
+    index2=index_X;
+    index1=index_Y;    
+    }
 
     uint16_t Number = Row_or_Column * in1_num * in2_num + index1 * in2_num + index2;
 
@@ -305,7 +323,7 @@ void trans_NetworktoWall(uint16_t* Row_or_Column, int16_t* index_X, int16_t* ind
     uint16_t in2_num=MAZE_SQUARE_NUM-1;
     uint16_t index1,index2;
 
-    *Row_or_Column = Number / in1_num * in2_num;
+    *Row_or_Column = Number / in1_num / in2_num;
 
     Number = Number - *Row_or_Column * in1_num * in2_num;
     index1 = Number / in2_num;
@@ -1544,7 +1562,7 @@ void create_DijkstraNetwork(void){
 	int16_t DiagonalCost=DIAGONALCOST;
 	int16_t discount_v[32]={180,298,398,487,567,641,709,774,835,895,955,1015,1075,1135,1195,1255,1315,1375,1435,1495,1555,1615,1675,1735,1795,1855,1915,1975,2035,2095,2155,2215};
     int16_t discount_d[64]={127,219,298,369,434,494,550,603,653,701,747,791,834,876,919,961,1004,1046,1088,1131,1173,1216,1258,1300,1343,1385,1428,1470,1513,1555,1597,1640,1682,1725,1767,1810,1852,1894,1937,1979,2022,2064,2107,2149,2191,2234,2276,2319,2361,2404,2446,2488,2531,2573,2616,2658,2701,2743,2785,2828,2870,2913,2955,2998};
-    int16_t tmp_Number,tmp_Number2,tmp_Number3;
+    uint16_t tmp_Number,tmp_Number2,tmp_Number3,tmp_Number4;
 	//printf("%d,%d,%d,%d,%d\n",discount_v[0],discount_v[1],discount_v[2],discount_v[3],discount_v[4]);
 	//printf("%d,%d,%d,%d,%d,%d\n",discount_d[0],discount_d[1],discount_d[2],discount_d[3],discount_d[4],discount_d[5]);
 	initStack_walk(&stack_xyr);
@@ -1563,155 +1581,207 @@ void create_DijkstraNetwork(void){
     tmp_Number=trans_WalltoNetwork(0,GOAL_X+1 ,GOAL_Y);
     pushStack_walk(&stack_xyr,tmp_Number);pushStack_walk(&stack_xyrf,tmp_Number);
     pushStack_walk(&stack_direction,8);pushStack_walk(&stack_cost,0);
-    tmp_Number=trans_WalltoNetwork(1,GOAL_Y ,GOAL_X);
+    tmp_Number=trans_WalltoNetwork(1,GOAL_X ,GOAL_Y);
     pushStack_walk(&stack_xyr,tmp_Number);pushStack_walk(&stack_xyrf,tmp_Number);
     pushStack_walk(&stack_direction,8);pushStack_walk(&stack_cost,0);
-    tmp_Number=trans_WalltoNetwork(1,GOAL_Y+1 ,GOAL_X);
+    tmp_Number=trans_WalltoNetwork(1,GOAL_X ,GOAL_Y+1);
     pushStack_walk(&stack_xyr,tmp_Number);pushStack_walk(&stack_xyrf,tmp_Number);
     pushStack_walk(&stack_direction,8);pushStack_walk(&stack_cost,0);
 
-
+int count=0;
 	unsigned short count_number = 1;
-	unsigned short Xcoordinate,Ycoordinate,Row_or_Column,Direction,dis_cost;
+	unsigned short Xcoordinate,Ycoordinate,Row_or_Column,Direction,dis_cost,dis_cost2;
     unsigned short Xcoordinate_f,Ycoordinate_f,Row_or_Column_f;
-    int t=0;
-	while (t<=10000) {
-t++;
+	while (1) {
 		tmp_Number = popStack_walk(&stack_xyr);
         trans_NetworktoWall(&Row_or_Column, &Xcoordinate, &Ycoordinate, tmp_Number);
-		tmp_Number2 = popStack_walk(&stack_xyrf);
+ 		tmp_Number2 = popStack_walk(&stack_xyrf);
         trans_NetworktoWall(&Row_or_Column_f, &Xcoordinate_f, &Ycoordinate_f, tmp_Number2);
         Direction = popStack_walk(&stack_direction);
 		dis_cost = popStack_walk(&stack_cost);
+
 		//printf("x %d,y %d,C(0)R(1) %d\n",Xcoordinate,Ycoordinate,Row_or_Column);
 		//printf("cost_num %d\n",dis_cost);
 		//printf("x head %d tail %d\n y head %d tail %d\n",stack_x.head,stack_x.tail,stack_y.head,stack_y.tail);
-		if (tmp_Number == MAX_WALKCOUNT_DIJKSTRA) {
+		if (dis_cost == MAX_WALKCOUNT_DIJKSTRA) {
 			//printf("stack_end\n");
 			break;
 		}
 		if(Row_or_Column==ROW){
 			if(Ycoordinate <= MAZE_SQUARE_NUM-3){
 				if(Direction==SLANT_NORTH){
-					dis_cost=dis_cost+1;
-					VerticalCost=discount_v[dis_cost];
-				}else{VerticalCost=discount_v[0];dis_cost=0;}
+					dis_cost2=dis_cost+1;
+					VerticalCost=discount_v[dis_cost2];
+				}else{VerticalCost=discount_v[0];dis_cost2=0;}
                 tmp_Number3=trans_WalltoNetwork(ROW,Xcoordinate ,Ycoordinate + 1);
 				if((wall.row[Ycoordinate+1] & (1 << Xcoordinate))==0 && ((Direction==SLANT_NORTH && Network[tmp_Number2][tmp_Number3]==MAX_WALKCOUNT_DIJKSTRA) || (Direction!=SLANT_NORTH && Network[tmp_Number][tmp_Number3]==MAX_WALKCOUNT_DIJKSTRA))){
                     pushStack_walk(&stack_xyr,tmp_Number3);
                     if(Direction==SLANT_NORTH){
                         Network[tmp_Number2][tmp_Number3]=VerticalCost;
                         Network[tmp_Number3][tmp_Number2]=VerticalCost;
-                        tmp_Number=trans_WalltoNetwork(Row_or_Column_f,Xcoordinate_f ,Ycoordinate_f);
+                        Network_dis[tmp_Number2][tmp_Number3]=dis_cost2;
+                        Network_dis[tmp_Number3][tmp_Number2]=dis_cost2;
+                        Network_dir[tmp_Number2][tmp_Number3]=SLANT_NORTH;
+                        Network_dir[tmp_Number3][tmp_Number2]=SLANT_NORTH;
+                        tmp_Number4=trans_WalltoNetwork(Row_or_Column_f,Xcoordinate_f ,Ycoordinate_f);
                     }else{
                         Network[tmp_Number][tmp_Number3]=VerticalCost;
                         Network[tmp_Number3][tmp_Number]=VerticalCost;
-                        tmp_Number=trans_WalltoNetwork(Row_or_Column,Xcoordinate ,Ycoordinate);
+                        Network_dis[tmp_Number][tmp_Number3]=dis_cost2;
+                        Network_dis[tmp_Number3][tmp_Number]=dis_cost2;
+                        Network_dir[tmp_Number][tmp_Number3]=SLANT_NORTH;
+                        Network_dir[tmp_Number3][tmp_Number]=SLANT_NORTH;
+                        tmp_Number4=trans_WalltoNetwork(Row_or_Column,Xcoordinate ,Ycoordinate);
                     }
-                    pushStack_walk(&stack_xyrf,tmp_Number);
+                    pushStack_walk(&stack_xyrf,tmp_Number4);
                     pushStack_walk(&stack_direction,SLANT_NORTH);
-					pushStack_walk(&stack_cost,dis_cost);
+					pushStack_walk(&stack_cost,dis_cost2);
 				}
 			}
 			if (Ycoordinate >= 1) {
 				if(Direction==SLANT_SOUTH){
-					dis_cost=dis_cost+1;
-					VerticalCost=discount_v[dis_cost];
-				}else{VerticalCost=discount_v[0];dis_cost=0;}
+					dis_cost2=dis_cost+1;
+					VerticalCost=discount_v[dis_cost2];
+				}else{VerticalCost=discount_v[0];dis_cost2=0;}
                 tmp_Number3=trans_WalltoNetwork(ROW,Xcoordinate ,Ycoordinate - 1);
 				if((wall.row[Ycoordinate-1] & (1 << Xcoordinate))==0 && ((Direction==SLANT_SOUTH && Network[tmp_Number2][tmp_Number3]==MAX_WALKCOUNT_DIJKSTRA) || (Direction!=SLANT_SOUTH && Network[tmp_Number][tmp_Number3]==MAX_WALKCOUNT_DIJKSTRA))){
                     pushStack_walk(&stack_xyr,tmp_Number3);
                     if(Direction==SLANT_SOUTH){
                         Network[tmp_Number2][tmp_Number3]=VerticalCost;
-                        Network[tmp_Number3][tmp_Number2]=VerticalCost;                        
-                        tmp_Number=trans_WalltoNetwork(Row_or_Column_f,Xcoordinate_f ,Ycoordinate_f);
+                        Network[tmp_Number3][tmp_Number2]=VerticalCost;
+                        Network_dis[tmp_Number2][tmp_Number3]=dis_cost2;
+                        Network_dis[tmp_Number3][tmp_Number2]=dis_cost2;                        
+                        Network_dir[tmp_Number2][tmp_Number3]=SLANT_SOUTH;
+                        Network_dir[tmp_Number3][tmp_Number2]=SLANT_SOUTH;
+                        tmp_Number4=trans_WalltoNetwork(Row_or_Column_f,Xcoordinate_f ,Ycoordinate_f);
                     }else{
                         Network[tmp_Number][tmp_Number3]=VerticalCost;
                         Network[tmp_Number3][tmp_Number]=VerticalCost;
-                        tmp_Number=trans_WalltoNetwork(Row_or_Column,Xcoordinate ,Ycoordinate);
+                        Network_dis[tmp_Number][tmp_Number3]=dis_cost2;
+                        Network_dis[tmp_Number3][tmp_Number]=dis_cost2;
+                        Network_dir[tmp_Number2][tmp_Number3]=SLANT_SOUTH;
+                        Network_dir[tmp_Number3][tmp_Number2]=SLANT_SOUTH;
+                        tmp_Number4=trans_WalltoNetwork(Row_or_Column,Xcoordinate ,Ycoordinate);
                     }
+                    pushStack_walk(&stack_xyrf,tmp_Number4);
 					pushStack_walk(&stack_direction,SLANT_SOUTH);
-					pushStack_walk(&stack_cost,dis_cost);
+					pushStack_walk(&stack_cost,dis_cost2);
 				}
 			}
 			if (Xcoordinate <= MAZE_SQUARE_NUM-2) {
 				if(Direction==SLANT_SOUTH_EAST){
-					dis_cost=dis_cost+1;
-					DiagonalCost=discount_d[dis_cost];
-				}else{DiagonalCost=discount_d[0];dis_cost=0;}
+					dis_cost2=dis_cost+1;
+					DiagonalCost=discount_d[dis_cost2];
+				}else{DiagonalCost=discount_d[0];dis_cost2=0;}
                  tmp_Number3=trans_WalltoNetwork(COLUMN,Xcoordinate ,Ycoordinate);
 				if((wall.column[Xcoordinate] & (1 << Ycoordinate))==0 && ((Direction==SLANT_SOUTH_EAST && Network[tmp_Number2][tmp_Number3]==MAX_WALKCOUNT_DIJKSTRA) || (Direction!=SLANT_SOUTH_EAST && Network[tmp_Number][tmp_Number3]==MAX_WALKCOUNT_DIJKSTRA))){                   
                     pushStack_walk(&stack_xyr,tmp_Number3);
                     if(Direction==SLANT_SOUTH_EAST){
                         Network[tmp_Number2][tmp_Number3]=DiagonalCost;
                         Network[tmp_Number3][tmp_Number2]=DiagonalCost;
-                        tmp_Number=trans_WalltoNetwork(Row_or_Column_f,Xcoordinate_f ,Ycoordinate_f);
+                        Network_dis[tmp_Number2][tmp_Number3]=dis_cost2;
+                        Network_dis[tmp_Number3][tmp_Number2]=dis_cost2;
+                        Network_dir[tmp_Number2][tmp_Number3]=SLANT_SOUTH_EAST;
+                        Network_dir[tmp_Number3][tmp_Number2]=SLANT_SOUTH_EAST;
+                        tmp_Number4=trans_WalltoNetwork(Row_or_Column_f,Xcoordinate_f ,Ycoordinate_f);
                     }else{
                         Network[tmp_Number][tmp_Number3]=DiagonalCost;
                         Network[tmp_Number3][tmp_Number]=DiagonalCost;
-                        tmp_Number=trans_WalltoNetwork(Row_or_Column,Xcoordinate ,Ycoordinate);
+                        Network_dis[tmp_Number][tmp_Number3]=dis_cost2;
+                        Network_dis[tmp_Number3][tmp_Number]=dis_cost2;
+                        Network_dir[tmp_Number][tmp_Number3]=SLANT_SOUTH_EAST;
+                        Network_dir[tmp_Number3][tmp_Number]=SLANT_SOUTH_EAST;
+                        tmp_Number4=trans_WalltoNetwork(Row_or_Column,Xcoordinate ,Ycoordinate);
                     }
+                    pushStack_walk(&stack_xyrf,tmp_Number4);
                     pushStack_walk(&stack_direction,SLANT_SOUTH_EAST);
-					pushStack_walk(&stack_cost,dis_cost);
+					pushStack_walk(&stack_cost,dis_cost2);
 				}
 				if(Direction==SLANT_NORTH_EAST){
-					dis_cost=dis_cost+1;
-					DiagonalCost=discount_d[dis_cost];
-				}else{DiagonalCost=discount_d[0];dis_cost=0;}
+					dis_cost2=dis_cost+1;
+					DiagonalCost=discount_d[dis_cost2];
+				}else{DiagonalCost=discount_d[0];dis_cost2=0;}
                 tmp_Number3=trans_WalltoNetwork(COLUMN,Xcoordinate ,Ycoordinate+1);
 				if((wall.column[Xcoordinate] & (1 << (Ycoordinate+1)))==0 && ((Direction==SLANT_NORTH_EAST && Network[tmp_Number2][tmp_Number3]==MAX_WALKCOUNT_DIJKSTRA) || (Direction!=SLANT_NORTH_EAST && Network[tmp_Number][tmp_Number3]==MAX_WALKCOUNT_DIJKSTRA))){
                     pushStack_walk(&stack_xyr,tmp_Number3);
                     if(Direction==SLANT_NORTH_EAST){
                         Network[tmp_Number2][tmp_Number3]=DiagonalCost;
                         Network[tmp_Number3][tmp_Number2]=DiagonalCost;
-                        tmp_Number=trans_WalltoNetwork(Row_or_Column_f,Xcoordinate_f ,Ycoordinate_f);
+                        Network_dis[tmp_Number2][tmp_Number3]=dis_cost2;
+                        Network_dis[tmp_Number3][tmp_Number2]=dis_cost2;
+                        Network_dir[tmp_Number2][tmp_Number3]=SLANT_NORTH_EAST;
+                        Network_dir[tmp_Number3][tmp_Number2]=SLANT_NORTH_EAST;
+                        tmp_Number4=trans_WalltoNetwork(Row_or_Column_f,Xcoordinate_f ,Ycoordinate_f);
                     }else{
                         Network[tmp_Number][tmp_Number3]=DiagonalCost;
                         Network[tmp_Number3][tmp_Number]=DiagonalCost;
-                        tmp_Number=trans_WalltoNetwork(Row_or_Column,Xcoordinate ,Ycoordinate);
+                        Network_dis[tmp_Number][tmp_Number3]=dis_cost2;
+                        Network_dis[tmp_Number3][tmp_Number]=dis_cost2;
+                        Network_dir[tmp_Number][tmp_Number3]=SLANT_NORTH_EAST;
+                        Network_dir[tmp_Number3][tmp_Number]=SLANT_NORTH_EAST;
+                        tmp_Number4=trans_WalltoNetwork(Row_or_Column,Xcoordinate ,Ycoordinate);
                     }
+                    pushStack_walk(&stack_xyrf,tmp_Number4);
 					pushStack_walk(&stack_direction,SLANT_NORTH_EAST);
-					pushStack_walk(&stack_cost,dis_cost);
+					pushStack_walk(&stack_cost,dis_cost2);
 				}
 			}
 			if (Xcoordinate >= 1) {
 				if(Direction==SLANT_SOUTH_WEST){
-					dis_cost=dis_cost+1;
-					DiagonalCost=discount_d[dis_cost];
-				}else{DiagonalCost=discount_d[0];dis_cost=0;}
+					dis_cost2=dis_cost+1;
+					DiagonalCost=discount_d[dis_cost2];
+				}else{DiagonalCost=discount_d[0];dis_cost2=0;}
                 tmp_Number3=trans_WalltoNetwork(COLUMN,Xcoordinate-1 ,Ycoordinate);
 				if((wall.column[Xcoordinate-1] & (1 << Ycoordinate))==0 && ((Direction==SLANT_SOUTH_WEST && Network[tmp_Number2][tmp_Number3]==MAX_WALKCOUNT_DIJKSTRA) || (Direction!=SLANT_SOUTH_WEST && Network[tmp_Number][tmp_Number3]==MAX_WALKCOUNT_DIJKSTRA))){
                     pushStack_walk(&stack_xyr,tmp_Number3);
                     if(Direction==SLANT_SOUTH_WEST){
                         Network[tmp_Number2][tmp_Number3]=DiagonalCost;
                         Network[tmp_Number3][tmp_Number2]=DiagonalCost;
-                        tmp_Number=trans_WalltoNetwork(Row_or_Column_f,Xcoordinate_f ,Ycoordinate_f);
+                        Network_dis[tmp_Number2][tmp_Number3]=dis_cost2;
+                        Network_dis[tmp_Number3][tmp_Number2]=dis_cost2;
+                        Network_dir[tmp_Number2][tmp_Number3]=SLANT_SOUTH_WEST;
+                        Network_dir[tmp_Number3][tmp_Number2]=SLANT_SOUTH_WEST;
+                        tmp_Number4=trans_WalltoNetwork(Row_or_Column_f,Xcoordinate_f ,Ycoordinate_f);
                     }else{
                         Network[tmp_Number][tmp_Number3]=DiagonalCost;
                         Network[tmp_Number3][tmp_Number]=DiagonalCost;
-                        tmp_Number=trans_WalltoNetwork(Row_or_Column,Xcoordinate ,Ycoordinate);
+                        Network_dis[tmp_Number][tmp_Number3]=dis_cost2;
+                        Network_dis[tmp_Number3][tmp_Number]=dis_cost2;                        
+                        Network_dir[tmp_Number][tmp_Number3]=SLANT_SOUTH_WEST;
+                        Network_dir[tmp_Number3][tmp_Number]=SLANT_SOUTH_WEST;
+                        tmp_Number4=trans_WalltoNetwork(Row_or_Column,Xcoordinate ,Ycoordinate);
                     }
+                    pushStack_walk(&stack_xyrf,tmp_Number4);
                     pushStack_walk(&stack_direction,SLANT_SOUTH_WEST);
-					pushStack_walk(&stack_cost,dis_cost);
+					pushStack_walk(&stack_cost,dis_cost2);
 				}
 				if(Direction==SLANT_NORTH_WEST){
-					dis_cost=dis_cost+1;
-					DiagonalCost=discount_d[dis_cost];
-				}else{DiagonalCost=discount_d[0];dis_cost=0;}
+					dis_cost2=dis_cost+1;
+					DiagonalCost=discount_d[dis_cost2];
+				}else{DiagonalCost=discount_d[0];dis_cost2=0;}
                     tmp_Number3=trans_WalltoNetwork(COLUMN,Xcoordinate-1 ,Ycoordinate+1);
                 if((wall.column[Xcoordinate-1] & (1 << (Ycoordinate+1)))==0 && ((Direction==SLANT_SOUTH_WEST && Network[tmp_Number2][tmp_Number3]==MAX_WALKCOUNT_DIJKSTRA) || (Direction!=SLANT_SOUTH_WEST && Network[tmp_Number][tmp_Number3]==MAX_WALKCOUNT_DIJKSTRA))){
                     pushStack_walk(&stack_xyr,tmp_Number3);
-                    if(Direction==SLANT_SOUTH_WEST){
+                    if(Direction==SLANT_NORTH_WEST){
                         Network[tmp_Number2][tmp_Number3]=DiagonalCost;
                         Network[tmp_Number3][tmp_Number2]=DiagonalCost;
-                        tmp_Number=trans_WalltoNetwork(Row_or_Column_f,Xcoordinate_f ,Ycoordinate_f);
+                        Network_dis[tmp_Number2][tmp_Number3]=dis_cost2;
+                        Network_dis[tmp_Number3][tmp_Number2]=dis_cost2;
+                        Network_dir[tmp_Number2][tmp_Number3]=SLANT_NORTH_WEST;
+                        Network_dir[tmp_Number3][tmp_Number2]=SLANT_NORTH_WEST;
+                        tmp_Number4=trans_WalltoNetwork(Row_or_Column_f,Xcoordinate_f ,Ycoordinate_f);
                     }else{
                         Network[tmp_Number][tmp_Number3]=DiagonalCost;
                         Network[tmp_Number3][tmp_Number]=DiagonalCost;
-                        tmp_Number=trans_WalltoNetwork(Row_or_Column,Xcoordinate ,Ycoordinate);
+                        Network_dis[tmp_Number][tmp_Number3]=dis_cost2;
+                        Network_dis[tmp_Number3][tmp_Number]=dis_cost2;
+                        Network_dir[tmp_Number][tmp_Number3]=SLANT_NORTH_WEST;
+                        Network_dir[tmp_Number3][tmp_Number]=SLANT_NORTH_WEST;
+                        tmp_Number4=trans_WalltoNetwork(Row_or_Column,Xcoordinate ,Ycoordinate);
                     }
+                    pushStack_walk(&stack_xyrf,tmp_Number4);
                     pushStack_walk(&stack_direction,SLANT_NORTH_WEST);
-					pushStack_walk(&stack_cost,dis_cost);
+					pushStack_walk(&stack_cost,dis_cost2);
 				}
 			}
 
@@ -1719,124 +1789,178 @@ t++;
 		if(Row_or_Column==COLUMN){
 					if(Xcoordinate <= MAZE_SQUARE_NUM-3){
 						if(Direction==SLANT_EAST){
-							dis_cost=dis_cost+1;
-							VerticalCost=discount_v[dis_cost];
-						}else{VerticalCost=discount_v[0];dis_cost=0;}
+							dis_cost2=dis_cost+1;
+							VerticalCost=discount_v[dis_cost2];
+						}else{VerticalCost=discount_v[0];dis_cost2=0;}
                             tmp_Number3=trans_WalltoNetwork(COLUMN,Xcoordinate+1 ,Ycoordinate);
                         if((wall.column[Xcoordinate+1] & (1 << Ycoordinate))==0 && ((Direction==SLANT_EAST && Network[tmp_Number2][tmp_Number3]==MAX_WALKCOUNT_DIJKSTRA) || (Direction!=SLANT_EAST && Network[tmp_Number][tmp_Number3]==MAX_WALKCOUNT_DIJKSTRA))){
                             pushStack_walk(&stack_xyr,tmp_Number3);
                     if(Direction==SLANT_EAST){
                         Network[tmp_Number2][tmp_Number3]=VerticalCost;
                         Network[tmp_Number3][tmp_Number2]=VerticalCost;
-                        tmp_Number=trans_WalltoNetwork(Row_or_Column_f,Xcoordinate_f ,Ycoordinate_f);
+                        Network_dis[tmp_Number2][tmp_Number3]=dis_cost2;
+                        Network_dis[tmp_Number3][tmp_Number2]=dis_cost2;
+                        Network_dir[tmp_Number2][tmp_Number3]=SLANT_EAST;
+                        Network_dir[tmp_Number3][tmp_Number2]=SLANT_EAST;
+                        tmp_Number4=trans_WalltoNetwork(Row_or_Column_f,Xcoordinate_f ,Ycoordinate_f);
                     }else{
                         Network[tmp_Number][tmp_Number3]=VerticalCost;
                         Network[tmp_Number3][tmp_Number]=VerticalCost;
-                        tmp_Number=trans_WalltoNetwork(Row_or_Column,Xcoordinate ,Ycoordinate);
+                        Network_dis[tmp_Number][tmp_Number3]=dis_cost2;
+                        Network_dis[tmp_Number3][tmp_Number]=dis_cost2;
+                        Network_dir[tmp_Number][tmp_Number3]=SLANT_EAST;
+                        Network_dir[tmp_Number3][tmp_Number]=SLANT_EAST;
+                        tmp_Number4=trans_WalltoNetwork(Row_or_Column,Xcoordinate ,Ycoordinate);
                     }
+                            pushStack_walk(&stack_xyrf,tmp_Number4);
                             pushStack_walk(&stack_direction,SLANT_EAST);
-							pushStack_walk(&stack_cost,dis_cost);
+							pushStack_walk(&stack_cost,dis_cost2);
 						}
 					}
 					if (Xcoordinate >= 1) {
 						if(Direction==SLANT_WEST){
-							dis_cost=dis_cost+1;
-							VerticalCost=discount_v[dis_cost];
-						}else{VerticalCost=discount_v[0];dis_cost=0;}
+							dis_cost2=dis_cost+1;
+							VerticalCost=discount_v[dis_cost2];
+						}else{VerticalCost=discount_v[0];dis_cost2=0;}
                             tmp_Number3=trans_WalltoNetwork(COLUMN,Xcoordinate-1 ,Ycoordinate);                        
 						if((wall.column[Xcoordinate-1] & (1 << Ycoordinate))==0 && ((Direction==SLANT_WEST && Network[tmp_Number2][tmp_Number3]==MAX_WALKCOUNT_DIJKSTRA) || (Direction!=SLANT_WEST && Network[tmp_Number][tmp_Number3]==MAX_WALKCOUNT_DIJKSTRA))){                           
                             pushStack_walk(&stack_xyr,tmp_Number3);
                     if(Direction==SLANT_WEST){
                         Network[tmp_Number2][tmp_Number3]=VerticalCost;
                         Network[tmp_Number3][tmp_Number2]=VerticalCost;
-                        tmp_Number=trans_WalltoNetwork(Row_or_Column_f,Xcoordinate_f ,Ycoordinate_f);
+                        Network_dis[tmp_Number2][tmp_Number3]=dis_cost2;
+                        Network_dis[tmp_Number3][tmp_Number2]=dis_cost2;
+                        Network_dir[tmp_Number2][tmp_Number3]=SLANT_WEST;
+                        Network_dir[tmp_Number3][tmp_Number2]=SLANT_WEST;
+                        tmp_Number4=trans_WalltoNetwork(Row_or_Column_f,Xcoordinate_f ,Ycoordinate_f);
                     }else{
                         Network[tmp_Number][tmp_Number3]=VerticalCost;
                         Network[tmp_Number3][tmp_Number]=VerticalCost;
-                        tmp_Number=trans_WalltoNetwork(Row_or_Column,Xcoordinate ,Ycoordinate);
+                        Network_dis[tmp_Number][tmp_Number3]=dis_cost2;
+                        Network_dis[tmp_Number3][tmp_Number]=dis_cost2;
+                        Network_dir[tmp_Number][tmp_Number3]=SLANT_WEST;
+                        Network_dir[tmp_Number3][tmp_Number]=SLANT_WEST;
+                        tmp_Number4=trans_WalltoNetwork(Row_or_Column,Xcoordinate ,Ycoordinate);
                     }
+                            pushStack_walk(&stack_xyrf,tmp_Number4);
 							pushStack_walk(&stack_direction,SLANT_WEST);
-							pushStack_walk(&stack_cost,dis_cost);
+							pushStack_walk(&stack_cost,dis_cost2);
 						}
 					}
 					if (Ycoordinate <= MAZE_SQUARE_NUM-2) {
 						if(Direction==SLANT_NORTH_WEST){
-							dis_cost=dis_cost+1;
-							DiagonalCost=discount_d[dis_cost];
-						}else{DiagonalCost=discount_d[0];dis_cost=0;}
+							dis_cost2=dis_cost+1;
+							DiagonalCost=discount_d[dis_cost2];
+						}else{DiagonalCost=discount_d[0];dis_cost2=0;}
                             tmp_Number3=trans_WalltoNetwork(ROW,Xcoordinate ,Ycoordinate);
 						if((wall.row[Ycoordinate] & (1 << Xcoordinate))==0 && ((Direction==SLANT_NORTH_WEST && Network[tmp_Number2][tmp_Number3]==MAX_WALKCOUNT_DIJKSTRA) || (Direction!=SLANT_NORTH_WEST && Network[tmp_Number][tmp_Number3]==MAX_WALKCOUNT_DIJKSTRA))){
                             pushStack_walk(&stack_xyr,tmp_Number3);
                     if(Direction==SLANT_NORTH_WEST){
                         Network[tmp_Number2][tmp_Number3]=DiagonalCost;
                         Network[tmp_Number3][tmp_Number2]=DiagonalCost;
-                        tmp_Number=trans_WalltoNetwork(Row_or_Column_f,Xcoordinate_f ,Ycoordinate_f);
+                        Network_dis[tmp_Number2][tmp_Number3]=dis_cost2;
+                        Network_dis[tmp_Number3][tmp_Number2]=dis_cost2;
+                        Network_dir[tmp_Number2][tmp_Number3]=SLANT_NORTH_WEST;
+                        Network_dir[tmp_Number3][tmp_Number2]=SLANT_NORTH_WEST;
+                        tmp_Number4=trans_WalltoNetwork(Row_or_Column_f,Xcoordinate_f ,Ycoordinate_f);
                     }else{
                         Network[tmp_Number][tmp_Number3]=DiagonalCost;
                         Network[tmp_Number3][tmp_Number]=DiagonalCost;
-                        tmp_Number=trans_WalltoNetwork(Row_or_Column,Xcoordinate ,Ycoordinate);
+                        Network_dis[tmp_Number][tmp_Number3]=dis_cost2;
+                        Network_dis[tmp_Number3][tmp_Number]=dis_cost2;
+                        Network_dir[tmp_Number][tmp_Number3]=SLANT_NORTH_WEST;
+                        Network_dir[tmp_Number3][tmp_Number]=SLANT_NORTH_WEST;
+                        tmp_Number4=trans_WalltoNetwork(Row_or_Column,Xcoordinate ,Ycoordinate);
                     }
+                            pushStack_walk(&stack_xyrf,tmp_Number4);
 							pushStack_walk(&stack_direction,SLANT_NORTH_WEST);
-							pushStack_walk(&stack_cost,dis_cost);
+							pushStack_walk(&stack_cost,dis_cost2);
 						}
 						if(Direction==SLANT_NORTH_EAST){
-							dis_cost=dis_cost+1;
-							DiagonalCost=discount_d[dis_cost];
-						}else{DiagonalCost=discount_d[0];dis_cost=0;}
+							dis_cost2=dis_cost+1;
+							DiagonalCost=discount_d[dis_cost2];
+						}else{DiagonalCost=discount_d[0];dis_cost2=0;}
                             tmp_Number3=trans_WalltoNetwork(ROW,Xcoordinate+1 ,Ycoordinate);
                         if((wall.row[Ycoordinate] & (1 << (Xcoordinate+1)))==0 && ((Direction==SLANT_NORTH_EAST && Network[tmp_Number2][tmp_Number3]==MAX_WALKCOUNT_DIJKSTRA) || (Direction!=SLANT_NORTH_EAST && Network[tmp_Number][tmp_Number3]==MAX_WALKCOUNT_DIJKSTRA))){
                             pushStack_walk(&stack_xyr,tmp_Number3);
                     if(Direction==SLANT_NORTH_EAST){
                         Network[tmp_Number2][tmp_Number3]=DiagonalCost;
                         Network[tmp_Number3][tmp_Number2]=DiagonalCost;
-                        tmp_Number=trans_WalltoNetwork(Row_or_Column_f,Xcoordinate_f ,Ycoordinate_f);
+                        Network_dis[tmp_Number2][tmp_Number3]=dis_cost2;
+                        Network_dis[tmp_Number3][tmp_Number2]=dis_cost2;
+                        Network_dir[tmp_Number2][tmp_Number3]=SLANT_NORTH_EAST;
+                        Network_dir[tmp_Number3][tmp_Number2]=SLANT_NORTH_EAST;
+                        tmp_Number4=trans_WalltoNetwork(Row_or_Column_f,Xcoordinate_f ,Ycoordinate_f);
                     }else{
                         Network[tmp_Number][tmp_Number3]=DiagonalCost;
                         Network[tmp_Number3][tmp_Number]=DiagonalCost;
-                        tmp_Number=trans_WalltoNetwork(Row_or_Column,Xcoordinate ,Ycoordinate);
+                        Network_dis[tmp_Number][tmp_Number3]=dis_cost2;
+                        Network_dis[tmp_Number3][tmp_Number]=dis_cost2;
+                        Network_dir[tmp_Number][tmp_Number3]=SLANT_NORTH_EAST;
+                        Network_dir[tmp_Number3][tmp_Number]=SLANT_NORTH_EAST;
+                        tmp_Number4=trans_WalltoNetwork(Row_or_Column,Xcoordinate ,Ycoordinate);
                     }
+                            pushStack_walk(&stack_xyrf,tmp_Number4);
 							pushStack_walk(&stack_direction,SLANT_NORTH_EAST);
-							pushStack_walk(&stack_cost,dis_cost);
+							pushStack_walk(&stack_cost,dis_cost2);
 						}
 					}
 					if (Ycoordinate >= 1) {
 						if(Direction==SLANT_SOUTH_WEST){
-							dis_cost=dis_cost+DISCOUNTCOST_D;
-							DiagonalCost=discount_d[dis_cost];
-						}else{DiagonalCost=discount_d[0];dis_cost=0;}
+							dis_cost2=dis_cost+1;
+							DiagonalCost=discount_d[dis_cost2];
+						}else{DiagonalCost=discount_d[0];dis_cost2=0;}
                         tmp_Number3=trans_WalltoNetwork(ROW,Xcoordinate ,Ycoordinate-1);
 						if((wall.row[Ycoordinate-1] & (1 << Xcoordinate))==0 && ((Direction==SLANT_SOUTH_WEST && Network[tmp_Number2][tmp_Number3]==MAX_WALKCOUNT_DIJKSTRA) || (Direction!=SLANT_SOUTH_WEST && Network[tmp_Number][tmp_Number3]==MAX_WALKCOUNT_DIJKSTRA))){
                             pushStack_walk(&stack_xyr,tmp_Number3);
                     if(Direction==SLANT_SOUTH_WEST){
                         Network[tmp_Number2][tmp_Number3]=DiagonalCost;
                         Network[tmp_Number3][tmp_Number2]=DiagonalCost;
-                        tmp_Number=trans_WalltoNetwork(Row_or_Column_f,Xcoordinate_f ,Ycoordinate_f);
+                        Network_dis[tmp_Number2][tmp_Number3]=dis_cost2;
+                        Network_dis[tmp_Number3][tmp_Number2]=dis_cost2;
+                        Network_dir[tmp_Number2][tmp_Number3]=SLANT_SOUTH_WEST;
+                        Network_dir[tmp_Number3][tmp_Number2]=SLANT_SOUTH_WEST;
+                        tmp_Number4=trans_WalltoNetwork(Row_or_Column_f,Xcoordinate_f ,Ycoordinate_f);
                     }else{
                         Network[tmp_Number][tmp_Number3]=DiagonalCost;
                         Network[tmp_Number3][tmp_Number]=DiagonalCost;
-                        tmp_Number=trans_WalltoNetwork(Row_or_Column,Xcoordinate ,Ycoordinate);
+                        Network_dis[tmp_Number][tmp_Number3]=dis_cost2;
+                        Network_dis[tmp_Number3][tmp_Number]=dis_cost2;
+                        Network_dir[tmp_Number][tmp_Number3]=SLANT_SOUTH_WEST;
+                        Network_dir[tmp_Number3][tmp_Number]=SLANT_SOUTH_WEST;
+                        tmp_Number4=trans_WalltoNetwork(Row_or_Column,Xcoordinate ,Ycoordinate);
                     }
+                            pushStack_walk(&stack_xyrf,tmp_Number4);
                             pushStack_walk(&stack_direction,SLANT_SOUTH_WEST);
-							pushStack_walk(&stack_cost,dis_cost);
+							pushStack_walk(&stack_cost,dis_cost2);
 						}
 						if(Direction==SLANT_SOUTH_EAST){
-							dis_cost=dis_cost+1;
-							DiagonalCost=discount_d[dis_cost];
-						}else{DiagonalCost=discount_d[0];dis_cost=0;}
+							dis_cost2=dis_cost+1;
+							DiagonalCost=discount_d[dis_cost2];
+						}else{DiagonalCost=discount_d[0];dis_cost2=0;}
                             tmp_Number3=trans_WalltoNetwork(ROW,Xcoordinate+1 ,Ycoordinate-1);
                         if((wall.row[Ycoordinate-1] & (1 << (Xcoordinate+1)))==0 && ((Direction==SLANT_SOUTH_EAST && Network[tmp_Number2][tmp_Number3]==MAX_WALKCOUNT_DIJKSTRA) || (Direction!=SLANT_SOUTH_EAST && Network[tmp_Number][tmp_Number3]==MAX_WALKCOUNT_DIJKSTRA))){
                             pushStack_walk(&stack_xyr,tmp_Number3);
                     if(Direction==SLANT_SOUTH_EAST){
                         Network[tmp_Number2][tmp_Number3]=DiagonalCost;
                         Network[tmp_Number3][tmp_Number2]=DiagonalCost;
-                        tmp_Number=trans_WalltoNetwork(Row_or_Column_f,Xcoordinate_f ,Ycoordinate_f);
+                        Network_dis[tmp_Number2][tmp_Number3]=dis_cost2;
+                        Network_dis[tmp_Number3][tmp_Number2]=dis_cost2;
+                        Network_dir[tmp_Number2][tmp_Number3]=SLANT_SOUTH_EAST;
+                        Network_dir[tmp_Number3][tmp_Number2]=SLANT_SOUTH_EAST;
+                        tmp_Number4=trans_WalltoNetwork(Row_or_Column_f,Xcoordinate_f ,Ycoordinate_f);
                     }else{
                         Network[tmp_Number][tmp_Number3]=DiagonalCost;
                         Network[tmp_Number3][tmp_Number]=DiagonalCost;
-                        tmp_Number=trans_WalltoNetwork(Row_or_Column,Xcoordinate ,Ycoordinate);
+                        Network_dis[tmp_Number][tmp_Number3]=dis_cost2;
+                        Network_dis[tmp_Number3][tmp_Number]=dis_cost2;
+                        Network_dir[tmp_Number][tmp_Number3]=SLANT_SOUTH_EAST;
+                        Network_dir[tmp_Number3][tmp_Number]=SLANT_SOUTH_EAST;                        
+                        tmp_Number4=trans_WalltoNetwork(Row_or_Column,Xcoordinate ,Ycoordinate);
                     }
+                            pushStack_walk(&stack_xyrf,tmp_Number4);
                             pushStack_walk(&stack_direction,SLANT_SOUTH_EAST);
-							pushStack_walk(&stack_cost,dis_cost);
+							pushStack_walk(&stack_cost,dis_cost2);
 						}
 					}
 
@@ -1850,6 +1974,95 @@ t++;
 
 }
 
+void create_DijkstraRoute(void){
+    STACK_T stack_route;
+    STACK_T stack_route_f;
+    uint16_t tmp_Number,tmp_Number2,tmp_Number3;
+    initStack_walk(&stack_route);
+    initStack_walk(&stack_route_f);
+	for(int i=0;i<=MAZE_SQUARE_NUM-1;i++){
+		for(int j=0;j<=MAZE_SQUARE_NUM-2;j++){
+			Dijkstra.column_count[i][j]=MAX_WALKCOUNT_DIJKSTRA;
+			Dijkstra.row_count[i][j]=MAX_WALKCOUNT_DIJKSTRA;
+            Dijkstra.column_route[i][j]=MAX_WALKCOUNT_DIJKSTRA;
+			Dijkstra.row_route[i][j]=MAX_WALKCOUNT_DIJKSTRA;
+		}
+	}
+	Dijkstra.row_count[GOAL_X][GOAL_Y]=0;
+	Dijkstra.row_count[GOAL_X+1][GOAL_Y]=0;
+	Dijkstra.column_count[GOAL_Y][GOAL_X]=0;
+	Dijkstra.column_count[GOAL_Y+1][GOAL_X]=0;
+    
+    tmp_Number=trans_WalltoNetwork(0,GOAL_X ,GOAL_Y);
+    pushStack_walk(&stack_route,tmp_Number);
+    pushStack_walk(&stack_route_f,tmp_Number);
+    tmp_Number=trans_WalltoNetwork(0,GOAL_X+1 ,GOAL_Y);
+    pushStack_walk(&stack_route,tmp_Number);
+    pushStack_walk(&stack_route_f,tmp_Number);
+    tmp_Number=trans_WalltoNetwork(1,GOAL_X ,GOAL_Y);
+    pushStack_walk(&stack_route,tmp_Number);
+    pushStack_walk(&stack_route_f,tmp_Number);
+    tmp_Number=trans_WalltoNetwork(1,GOAL_X ,GOAL_Y+1);
+    pushStack_walk(&stack_route,tmp_Number);
+    pushStack_walk(&stack_route_f,tmp_Number);
+
+    int count=0;
+	unsigned short count_number = 1;
+	unsigned short Xcoordinate,Ycoordinate,Row_or_Column,cost;
+    unsigned short Xcoordinate_f,Ycoordinate_f,Row_or_Column_f,cost_f;  
+    unsigned short Xcoordinate2,Ycoordinate2,Row_or_Column2,cost2;  
+	while (1) {
+
+		tmp_Number = popStack_walk(&stack_route);
+        trans_NetworktoWall(&Row_or_Column, &Xcoordinate, &Ycoordinate, tmp_Number);
+        tmp_Number2 = popStack_walk(&stack_route_f);
+        trans_NetworktoWall(&Row_or_Column_f, &Xcoordinate_f, &Ycoordinate_f, tmp_Number2);
+        cost=Dijkstra.row_count[Xcoordinate][Ycoordinate];
+        if(Row_or_Column==ROW){
+            cost=Dijkstra.row_count[Xcoordinate][Ycoordinate];
+         }
+         else{
+            cost=Dijkstra.column_count[Ycoordinate][Xcoordinate];
+         }        
+
+		if (tmp_Number == MAX_WALKCOUNT_DIJKSTRA) {
+			//printf("stack_end\n");
+			break;
+		}
+		
+        for(int i=0;i<2*MAZE_SQUARE_NUM*(MAZE_SQUARE_NUM-1);i++){
+            if(Network[tmp_Number][i]!=MAX_WALKCOUNT_DIJKSTRA){
+                trans_NetworktoWall(&Row_or_Column2, &Xcoordinate2, &Ycoordinate2, i);
+                if(Row_or_Column2==ROW){
+                    cost2=Dijkstra.row_count[Xcoordinate2][Ycoordinate2];
+                }
+                else{
+                    cost2=Dijkstra.column_count[Ycoordinate2][Xcoordinate2];
+                }
+                if(cost2>cost+Network[tmp_Number][i]){
+                    if(Row_or_Column2==ROW){
+                        Dijkstra.row_count[Xcoordinate2][Ycoordinate2]=cost+Network[tmp_Number][i];
+                        Dijkstra.row_route[Xcoordinate2][Ycoordinate2]=tmp_Number;
+                    }
+                    else{
+                        Dijkstra.column_count[Ycoordinate2][Xcoordinate2]=cost+Network[tmp_Number][i];
+                        Dijkstra.column_route[Ycoordinate2][Xcoordinate2]=tmp_Number;
+                    }
+                    pushStack_walk(&stack_route,i);
+                    pushStack_walk(&stack_route_f,tmp_Number);
+                }
+            }
+        
+        }
+
+
+		count_number+=1;
+
+		}
+
+
+
+}
 
 
 void run_movement_continuity(int *direction,unsigned short front_count,unsigned short right_count,
@@ -2017,8 +2230,9 @@ void pass_maker_Dijkstra(void){
 	int y = 0;
 	int direction = 1;
 	pass_count = 0;
-	create_DijkstraMap();
+	//create_DijkstraMap();
     create_DijkstraNetwork();
+    create_DijkstraRoute();
 	maze_display_Dijkstra();
     int count=0;
 	pass[0] = 1;
@@ -2108,6 +2322,81 @@ void pass_maker_Dijkstra(void){
 }
 
 
+
+void pass_maker_DijkstraNetwork(void){
+
+    uint16_t tmp_Number,tmp_Number2,tmp_Number3;
+	int x = 0;
+	int y = 0;
+	int direction = 1;
+    uint32_t count=0;
+    unsigned short Xcoordinate,Ycoordinate,Row_or_Column,dista
+    int8_t direc,direc0,delta_direc;
+	pass_count = 0;
+    create_DijkstraNetwork();
+    create_DijkstraRoute();
+	maze_display_Dijkstra();
+
+    tmp_Number=0;
+    Xcoordinate=0;
+    Ycoordinate=0;
+    Row_or_Column=0;
+    direc0=SLANT_NORTH;
+	x_log_net[count]=0;
+    y_log_net[count]=0;
+    rc_log_net[count]=0;
+    dis_log_net[count]=0;
+    count++;
+
+    pass[pass_count]=1;
+    pass_count++;
+
+        //trans_WalltoNetwork(0,GOAL_X ,GOAL_Y);
+    
+while(1){
+        if(Row_or_Column==0){
+        tmp_Number2=Dijkstra.row_route[Xcoordinate][Ycoordinate];
+        trans_NetworktoWall(&Row_or_Column, &Xcoordinate, &Ycoordinate, tmp_Number2);
+        }else{
+        tmp_Number2=Dijkstra.column_route[Ycoordinate][Xcoordinate];
+        trans_NetworktoWall(&Row_or_Column, &Xcoordinate, &Ycoordinate, tmp_Number2);
+        }
+        dista=Network_dis[tmp_Number][tmp_Number2]+1;
+        direc=Network_dir[tmp_Number][tmp_Number2];
+	x_log_net[count]=Xcoordinate;
+    y_log_net[count]=Ycoordinate;
+    rc_log_net[count]=Row_or_Column;
+    dis_log_net[count]=dista;
+    delta_direc=direc-direc0;
+    if(delta_direc > 5){delta_direc-=8;}else if(delta_direc < -5){delta_direc+=8;}
+    count++;
+
+    if(delta_direc==1){
+        pass[pass_count]= -100;
+    }else if(delta_direc== -1){
+        pass[pass_count]= -101;
+    }else if(delta_direc== 2){
+        pass[pass_count]= -102;
+    }else if(delta_direc== -2){
+        pass[pass_count]= -103;
+    }else{
+        pass[pass_count]= -1;
+    }
+    
+    pass_count++;
+    pass[pass_count]=dista;
+    pass_count++;
+    if((Xcoordinate == GOAL_X || Xcoordinate == GOAL_X+1) && (Ycoordinate == GOAL_Y || Ycoordinate == GOAL_Y+1)){break;}
+
+    tmp_Number=tmp_Number2;
+    direc0=direc;
+
+}
+    
+}
+
+
+
 void run_shortest(float inspeed, float inacc, int stmass, char pass_mode, char fun_mode,
 		char slant_mode, parameter_speed howspeed,float fun_ratio,char mollifier_mode) {
 	unsigned char slant_count;
@@ -2145,7 +2434,7 @@ void run_shortest(float inspeed, float inacc, int stmass, char pass_mode, char f
 		wall.column[i] = wall.column[i] | wall.column_look[i];
 	}
 	//pass_maker();
-   pass_maker_Dijkstra();
+   pass_maker_DijkstraNetwork();
     
 
 	pass_count = 1;
@@ -2661,7 +2950,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
         x_log[i]=0;
         y_log[i]=0;
     }
-    run_shortest(3000,10000,0,1,1,1,speed300_exploration,0.99,1);
+    run_shortest(3000,10000,0,0,0,0,speed300_exploration,0.99,1);
 
 
   /* create a 2-by-2 array of unsigned 16-bit integers */
@@ -2700,4 +2989,27 @@ void mexFunction( int nlhs, mxArray *plhs[],
   bytes_to_copy = TOTAL_ELEMENTS4 * mxGetElementSize(plhs[5]);
   memcpy(start_of_pr,Network,bytes_to_copy); 
 
+   /* create a 2-by-2 array of unsigned 16-bit integers */
+  plhs[6] = mxCreateNumericArray(2,dims0,mxINT32_CLASS,mxREAL);
+  start_of_pr = (unsigned char *)mxGetData(plhs[6]);
+  bytes_to_copy = PASS_NUM * mxGetElementSize(plhs[6]);
+  memcpy(start_of_pr,x_log_net,bytes_to_copy);
+
+  /* create a 2-by-2 array of unsigned 16-bit integers */
+  plhs[7] = mxCreateNumericArray(2,dims0,mxINT32_CLASS,mxREAL);
+  start_of_pr = (unsigned char *)mxGetData(plhs[7]);
+  bytes_to_copy = PASS_NUM * mxGetElementSize(plhs[7]);
+  memcpy(start_of_pr,y_log_net,bytes_to_copy);   
+
+       /* create a 2-by-2 array of unsigned 16-bit integers */
+  plhs[8] = mxCreateNumericArray(2,dims0,mxINT32_CLASS,mxREAL);
+  start_of_pr = (unsigned char *)mxGetData(plhs[8]);
+  bytes_to_copy = PASS_NUM * mxGetElementSize(plhs[8]);
+  memcpy(start_of_pr,rc_log_net,bytes_to_copy);
+
+       /* create a 2-by-2 array of unsigned 16-bit integers */
+  plhs[9] = mxCreateNumericArray(2,dims0,mxINT32_CLASS,mxREAL);
+  start_of_pr = (unsigned char *)mxGetData(plhs[9]);
+  bytes_to_copy = PASS_NUM * mxGetElementSize(plhs[9]);
+  memcpy(start_of_pr,dis_log_net,bytes_to_copy);    
 }

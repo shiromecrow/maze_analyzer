@@ -1,5 +1,5 @@
 %mex run_maze_solve_front.c
-mex run_maze_solve_back.c
+%mex run_maze_solve_back.c
 mex run_pass_maker.c
 mex run_pass_maker2.c
 
@@ -21,7 +21,9 @@ video_flg = 0;
 %画像なら0,数字直打ち1
 get_maze_mode=1;
 global WalkCount_display_flg;
+global Network_display_flg;
 WalkCount_display_flg=1;
+Network_display_flg=0;
 %% ビデオ記録用変数の宣言
 if video_flg
     vidObj = VideoWriter('result.mp4','MPEG-4');
@@ -198,16 +200,17 @@ T_all
 %     uint32(goal_x),uint32(goal_y),coordinate(1),coordinate(2),coordinate(3),Sensor_front,Sensor_right,Sensor_left, ...
 %     all_mode(1),all_mode(2),D_row_map,D_column_map);
 
-[Pass,Xp,Yp,D_row_map,D_column_map,D_Network]=run_pass_maker2( ...
+[Pass,Xp,Yp,D_row_map,D_column_map,D_Network,Xp2,Yp2,RCp,Disp]=run_pass_maker2( ...
     wall_row,wall_column,wall_row_look,wall_column_look, ...
     uint32(goal_x),uint32(goal_y),coordinate(1),coordinate(2),coordinate(3),Sensor_front,Sensor_right,Sensor_left, ...
     all_mode(1),all_mode(2),D_row_map,D_column_map);
 
 D_row_map=D_row_map';
 D_column_map=D_column_map';
-maze_data_plot2_Dresult(wall_row,maze_row_size,wall_column,maze_col_size,D_row_map,D_column_map);
+maze_data_plot2_Dresult(wall_row,maze_row_size,wall_column,maze_col_size,D_row_map,D_column_map,D_Network);
 
-route_plot(Xp,Yp);
+%route_plot(Xp,Yp);
+route_plot_network(Xp2,Yp2,RCp);
 %route_maker(Pass);
 
 %% ビデオ作成の完了
