@@ -1,5 +1,5 @@
-%mex run_maze_solve_front.c
-%mex run_maze_solve_back.c
+mex run_maze_solve_front.c
+mex run_maze_solve_back.c
 mex run_pass_maker.c
 mex run_pass_maker2.c
 
@@ -200,7 +200,7 @@ T_all
 %     uint32(goal_x),uint32(goal_y),coordinate(1),coordinate(2),coordinate(3),Sensor_front,Sensor_right,Sensor_left, ...
 %     all_mode(1),all_mode(2),D_row_map,D_column_map);
 
-[Pass,Xp,Yp,D_row_map,D_column_map,D_Network,Xp2,Yp2,RCp,Disp]=run_pass_maker2( ...
+[Pass,Xp,Yp,D_row_map,D_column_map,D_Network,Xp2,Yp2,RCp,Disp,Dirp]=run_pass_maker2( ...
     wall_row,wall_column,wall_row_look,wall_column_look, ...
     uint32(goal_x),uint32(goal_y),coordinate(1),coordinate(2),coordinate(3),Sensor_front,Sensor_right,Sensor_left, ...
     all_mode(1),all_mode(2),D_row_map,D_column_map);

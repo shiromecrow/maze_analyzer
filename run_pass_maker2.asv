@@ -150,7 +150,7 @@ char Dijkstra_maker_flag;
 uint32_t walk_count[MAZE_SQUARE_NUM][MAZE_SQUARE_NUM]; //歩数いれる箱
 uint16_t Network[2*MAZE_SQUARE_NUM*(MAZE_SQUARE_NUM-1)][2*MAZE_SQUARE_NUM*(MAZE_SQUARE_NUM-1)]; //ネットワーク
 uint8_t Network_dis[2*MAZE_SQUARE_NUM*(MAZE_SQUARE_NUM-1)][2*MAZE_SQUARE_NUM*(MAZE_SQUARE_NUM-1)]; //距離の保存
-uint8_t Network_dir[2*MAZE_SQUARE_NUM*(MAZE_SQUARE_NUM-1)][2*MAZE_SQUARE_NUM*(MAZE_SQUARE_NUM-1)]; //方向の保存
+int8_t Network_dir[2*MAZE_SQUARE_NUM*(MAZE_SQUARE_NUM-1)][2*MAZE_SQUARE_NUM*(MAZE_SQUARE_NUM-1)]; //方向の保存
 char error_mode;
 DIJKSTRA Dijkstra;
 uint16_t g_sensor_front,g_sensor_right,g_sensor_left;
@@ -164,6 +164,7 @@ int x_log_net[PASS_NUM]; //1f 2r 3l
 int y_log_net[PASS_NUM]; //1f 2r 3l
 int rc_log_net[PASS_NUM]; //1f 2r 3l
 int dis_log_net[PASS_NUM]; //1f 2r 3l
+int dir_log_net[PASS_NUM]; //1f 2r 3l
 
 void initStack_walk(STACK_T *stack){
 //	for(int i=0;i<=MAX_QUEUE_NUM-1;i++){
@@ -1659,8 +1660,8 @@ int count=0;
                         Network[tmp_Number3][tmp_Number]=VerticalCost;
                         Network_dis[tmp_Number][tmp_Number3]=dis_cost2;
                         Network_dis[tmp_Number3][tmp_Number]=dis_cost2;
-                        Network_dir[tmp_Number2][tmp_Number3]=SLANT_SOUTH;
-                        Network_dir[tmp_Number3][tmp_Number2]=SLANT_SOUTH;
+                        Network_dir[tmp_Number][tmp_Number3]=SLANT_SOUTH;
+                        Network_dir[tmp_Number3][tmp_Number]=SLANT_SOUTH;
                         tmp_Number4=trans_WalltoNetwork(Row_or_Column,Xcoordinate ,Ycoordinate);
                     }
                     pushStack_walk(&stack_xyrf,tmp_Number4);
@@ -2329,8 +2330,9 @@ void pass_maker_DijkstraNetwork(void){
 	int x = 0;
 	int y = 0;
 	int direction = 1;
+    char turn_num=0;
     uint32_t count=0;
-    unsigned short Xcoordinate,Ycoordinate,Row_or_Column,dista
+    unsigned short Xcoordinate,Ycoordinate,Row_or_Column,dista;
     int8_t direc,direc0,delta_direc;
 	pass_count = 0;
     create_DijkstraNetwork();
@@ -2341,11 +2343,12 @@ void pass_maker_DijkstraNetwork(void){
     Xcoordinate=0;
     Ycoordinate=0;
     Row_or_Column=0;
-    direc0=SLANT_NORTH;
+    direc0=SLANT_SOUTH;
 	x_log_net[count]=0;
     y_log_net[count]=0;
     rc_log_net[count]=0;
     dis_log_net[count]=0;
+    dir_log_net[count]=SLANT_SOUTH;
     count++;
 
     pass[pass_count]=1;
@@ -2367,24 +2370,30 @@ while(1){
     y_log_net[count]=Ycoordinate;
     rc_log_net[count]=Row_or_Column;
     dis_log_net[count]=dista;
-    delta_direc=direc-direc0;
+    dir_log_net[count]=direc;
+   delta_direc=direc-direc0;
     if(delta_direc > 5){delta_direc-=8;}else if(delta_direc < -5){delta_direc+=8;}
     count++;
 
     if(delta_direc==1){
-        pass[pass_count]= -100;
+        pass[pass_count]= -100;//右45その場旋回
     }else if(delta_direc== -1){
-        pass[pass_count]= -101;
+        pass[pass_count]= -101;//左45その場旋回
     }else if(delta_direc== 2){
-        pass[pass_count]= -102;
+        pass[pass_count]= -102;//右90その場旋回
     }else if(delta_direc== -2){
-        pass[pass_count]= -103;
+        pass[pass_count]= -103;//左90その場旋回
     }else{
         pass[pass_count]= -1;
     }
     
+    //pass[pass_count]= -2;
     pass_count++;
-    pass[pass_count]=dista;
+    if(direc==SLANT_NORTH || direc==SLANT_SOUTH || direc==SLANT_EAST || direc==SLANT_WEST){
+    pass[pass_count]=dista*2;
+    }else{
+    pass[pass_count]=SLANT_PASS_COUNT+dista;
+    }
     pass_count++;
     if((Xcoordinate == GOAL_X || Xcoordinate == GOAL_X+1) && (Ycoordinate == GOAL_Y || Ycoordinate == GOAL_Y+1)){break;}
 
@@ -2392,6 +2401,84 @@ while(1){
     direc0=direc;
 
 }
+
+    pass_count = 1;
+while (1) {		//パス圧縮    
+    if (pass[pass_count] == 0) {break;}
+
+    if(pass[pass_count] == -100 && pass[pass_count-1] >0 && pass[pass_count-1] < SLANT_PASS_COUNT){
+        if(pass[pass_count-1]==1){pass[pass_count-1]=-1;}else{pass[pass_count-1]--;}
+        turn_num=0;
+    while(1){
+        if(pass[pass_count]==-100){turn_num++;}
+        if(pass[pass_count]==-102){turn_num+=2;}
+        if(pass[pass_count]>1 && pass[pass_count]<SLANT_PASS_COUNT){break;} 
+        if(pass[pass_count]>SLANT_PASS_COUNT+1){break;}
+        pass[pass_count]=-1;
+        pass_count++;
+    }
+        if(turn_num==1){pass[pass_count-1]=-8;}
+        if(turn_num==2){pass[pass_count-1]=-4;}
+        if(turn_num==3){pass[pass_count-1]=-10;}
+        if(turn_num==4){pass[pass_count-1]=-6;}  
+        if(pass[pass_count]==1){pass[pass_count]=-1;}else{pass[pass_count]--;}
+    }
+
+    if(pass[pass_count] == -101 && pass[pass_count-1] >0 && pass[pass_count-1] < SLANT_PASS_COUNT){
+        if(pass[pass_count-1]==1){pass[pass_count-1]=-1;}else{pass[pass_count-1]--;}
+        turn_num=0;
+    while(1){
+        if(pass[pass_count]==-101){turn_num++;}
+        if(pass[pass_count]==-103){turn_num+=2;}
+        if(pass[pass_count]>1 && pass[pass_count]<SLANT_PASS_COUNT){break;} 
+        if(pass[pass_count]>SLANT_PASS_COUNT+1){break;}
+        pass[pass_count]=-1;
+        pass_count++;
+    }
+        if(turn_num==1){pass[pass_count-1]=-9;}
+        if(turn_num==2){pass[pass_count-1]=-5;}
+        if(turn_num==3){pass[pass_count-1]=-11;}
+        if(turn_num==4){pass[pass_count-1]=-7;}  
+    }
+
+
+
+    if(pass[pass_count] == -100 && pass[pass_count-1] > SLANT_PASS_COUNT){
+        if(pass[pass_count-1]==1){pass[pass_count-1]=-1;}else{pass[pass_count-1]--;}
+        turn_num=0;
+    while(1){
+        if(pass[pass_count]==-100){turn_num++;}
+        if(pass[pass_count]==-102){turn_num+=2;}
+        if(pass[pass_count]>1 && pass[pass_count]<SLANT_PASS_COUNT){break;} 
+        if(pass[pass_count]>SLANT_PASS_COUNT+1){break;}
+        pass[pass_count]=-1;
+        pass_count++;
+    }
+        if(turn_num==1){pass[pass_count-1]=-12;}
+        if(turn_num==2){pass[pass_count-1]=-16;}
+        if(turn_num==3){pass[pass_count-1]=-14;}  
+    }
+
+    if(pass[pass_count] == -101 && pass[pass_count-1] > SLANT_PASS_COUNT){
+        if(pass[pass_count-1]==SLANT_PASS_COUNT+1){pass[pass_count-1]=-1;}else{pass[pass_count-1]--;}
+        turn_num=0;
+    while(1){
+        if(pass[pass_count]==-101){turn_num++;}
+        if(pass[pass_count]==-103){turn_num+=2;}
+        if(pass[pass_count]>1 && pass[pass_count]<SLANT_PASS_COUNT){break;} 
+        if(pass[pass_count]>SLANT_PASS_COUNT+1){break;}
+        pass[pass_count]=-1;
+        pass_count++;
+    }
+        if(turn_num==1){pass[pass_count-1]=-13;}
+        if(turn_num==2){pass[pass_count-1]=-17;}
+        if(turn_num==3){pass[pass_count-1]=-15;}  
+    }
+
+pass_count++;
+}
+
+
     
 }
 
@@ -2828,7 +2915,9 @@ if(pass_mode==1){
 			}
 
 			pass_count++;
-		}
+		}else{
+        pass_count++;
+        }
 
 		if (pass[pass_count] == 0) {
 			break;
@@ -3012,4 +3101,10 @@ void mexFunction( int nlhs, mxArray *plhs[],
   start_of_pr = (unsigned char *)mxGetData(plhs[9]);
   bytes_to_copy = PASS_NUM * mxGetElementSize(plhs[9]);
   memcpy(start_of_pr,dis_log_net,bytes_to_copy);    
+
+       /* create a 2-by-2 array of unsigned 16-bit integers */
+  plhs[10] = mxCreateNumericArray(2,dims0,mxINT32_CLASS,mxREAL);
+  start_of_pr = (unsigned char *)mxGetData(plhs[10]);
+  bytes_to_copy = PASS_NUM * mxGetElementSize(plhs[10]);
+  memcpy(start_of_pr,dir_log_net,bytes_to_copy);  
 }
