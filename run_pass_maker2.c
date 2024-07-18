@@ -9,7 +9,7 @@
  */
 
 
-#define MAZE_SQUARE_NUM 16
+#define MAZE_SQUARE_NUM 32
 #define PASS_NUM 501
 
 #define NDIMS 2
